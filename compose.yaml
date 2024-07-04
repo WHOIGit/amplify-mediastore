@@ -1,21 +1,22 @@
 
 services:
 
-  db:
-    image: postgres
-    volumes:
-      - ./vols/db:/var/lib/postgresql/data
-    env_file:
-      - .env
+#  db:
+#    image: postgres
+#    volumes:
+#      - ./vols/db:/var/lib/postgresql/data
+#    env_file:
+#      - .env
 
   api:
     build: .
     command: ./start-django
     volumes:
       - ./app:/app
+      - ./vols/db:/app/db
     ports:
       - "8000:8000"
     env_file:
       - .env
-    depends_on:
-      - db
+#    depends_on:
+#      - db
