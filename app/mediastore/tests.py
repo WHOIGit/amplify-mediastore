@@ -78,7 +78,7 @@ class MediaApiTest(TestCase):
         self.assertEqual(resp1.status_code, 200, msg=resp1.content.decode())
         m6b = MediaSchema(metadata={'EGG':'NOG'},
                 ids=[IdentitySchema(type='FLN', token='myfile.txt')])
-        resp2 = self.client.put("/media/patch/m6", json=m6b.dict())
+        resp2 = self.client.put("/media/m6", json=m6b.dict())
         self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
         expected = {"metadata": {"EGG": "NOG"},
                     "ids": [{"type": "AMP", "token": "m6", "is_pid": True},
@@ -104,7 +104,7 @@ class MediaApiTest(TestCase):
         received = ordered(json.loads(resp4.content.decode()))
         self.assertEqual(received, [expected], msg=resp4.content.decode())
 
-        resp5 = self.client.delete("/media/del/m6")
+        resp5 = self.client.delete("/media/m6")
         self.assertEqual(resp5.status_code, 204, msg=resp5.content.decode())
 
         with self.assertRaises(ObjectDoesNotExist):
