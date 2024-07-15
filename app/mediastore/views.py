@@ -21,18 +21,22 @@ def create_media(request, media: MediaSchema):
     return MediaService.create(media)
 
 
-@api.get('/media/{id}', response=MediaSchema)
-def read_media(request, id: str):
-    return MediaService.read(id)
+@api.get('/media/{pid}', response=MediaSchema)
+def read_media(request, pid: str):
+    return MediaService.read(pid)
 
 
-@api.put('/media/patch/{pid}', response={204: int})
-def update_media(request, pid: str, media: MediaSchema):
-    MediaService.update(pid, media)
+@api.put('/media/{pid}', response={204: int})
+def put_media(request, pid: str, media: MediaSchema):
+    MediaService.put(pid, media)
     return 204
 
+@api.patch('/media/{pid}', response={204: int})
+def patch_media(request, pid: str, media: MediaSchema):
+    MediaService.patch(pid, media)
+    return 204
 
-@api.delete('/media/del/{pid}', response={204: int})
+@api.delete('/media/{pid}', response={204: int})
 def delete_media(request, pid: str):
     MediaService.delete(pid)
     return 204

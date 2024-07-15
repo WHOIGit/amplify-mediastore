@@ -33,16 +33,47 @@ class MediaService:
         return MediaService.serialize(media)
 
     @staticmethod
-    def update(pid: str, media_input: MediaSchema) -> str:
+    def put(pid: str, media_input: MediaSchema) -> str:
         #media = Identity.objects.get(token=pid, is_pid=True).select_related('media').media
         media = Media.objects.filter(ids__is_pid=True, ids__token=pid)
         if media_input.metadata: media.update(metadata=media_input.metadata)
         media = media.first()
         extant_ids = Identity.objects.filter(media__id=media.id)
+        for extant_id in extant_ids:
+            keepme = False
+            for ident_schema in media_input.ids:
+                if extant_id.type == ident_schema.type and extant_id.token == ident_schema.token:
+                    keepme = True
+            if not keepme:
+                extant_id.delete()
+        extant_ids = Identity.objects.filter(media__id=media.id)
         for ident_schema in media_input.ids:
             extant_id = extant_ids.filter(type=ident_schema.type, token=ident_schema.token)
             if extant_id.exists():
                 extant_id.update(ident_schema)
+            else:
+                ident_obj = Identity.objects.create(
+                    type=ident_schema.type,
+                    token=ident_schema.token,
+                    media=media,
+                    is_pid=ident_schema.is_pid if hasattr(ident_schema, 'is_pid') else False)
+
+        return media
+
+    @staticmethod
+    def patch(pid: str, media_input: MediaSchema) -> str:
+        #media = Identity.objects.get(token=pid, is_pid=True).select_related('media').media
+        media = Media.objects.filter(ids__is_pid=True, ids__token=pid).first()
+        media.metadata.update(**media_input.metadata)
+        media.save()
+
+        extant_ids = Identity.objects.filter(media__id=media.id)
+        for ident_schema in media_input.ids:
+            extant_id = extant_ids.filter(type=ident_schema.type, token=ident_schema.token)
+            if extant_id.exists():
+                extant_id = extant_id.first()
+                extant_id.is_pid = ident_schema.is_pid
+                extant_id.save()
             else:
                 ident_obj = Identity.objects.create(
                     type=ident_schema.type,
