@@ -43,6 +43,7 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
 #    'psycopg',
     'ninja',
+    'taggit',
     ]
 
 LOCAL_APPS = [

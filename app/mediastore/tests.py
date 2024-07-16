@@ -66,6 +66,7 @@ class MediaApiTest(TestCase):
             identifiers = {'BIN':'bin_xyz'},
             s3url = '',
             metadata = {},
+            tags = [],
         )
         resp = self.client.post("/media", json=payload)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
@@ -119,7 +120,8 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             s3url = 'bucketA:xyz',
-            metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'}
+            metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'},
+            tags=['one', 'two'],
         )
         resp = self.client.post("/media", json=payload)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
@@ -127,7 +129,8 @@ class MediaApiTest(TestCase):
         PK = received1['pk']
         payload2 = dict(s3url='bucketB:abc',
                         identifiers={'DEMO2':'newvalue'},
-                        metadata={'EGG':'NOG','zip':'ZAP'})
+                        metadata={'EGG':'NOG','zip':'ZAP'},
+                        tags = ['two', 'three'],)
 
         resp2 = self.client.patch(f'/media/{PID}', json=payload2)
         self.assertEqual(resp.status_code, 200, msg=resp2.content.decode())  # TODO why status_code != 204 ?
@@ -143,7 +146,8 @@ class MediaApiTest(TestCase):
             pid_type = 'DEMO',
             s3url = 'bucketB:abc',
             identifiers = {'DEMO2':'newvalue'},
-            metadata = {'egg':'nog', 'EGG':'NOG', 'zip':'ZAP', 'quick':'quack'}
+            metadata = {'egg':'nog', 'EGG':'NOG', 'zip':'ZAP', 'quick':'quack'},
+            tags = ['one', 'two', 'three'],
         )
 
         expected = ordered(expected)
@@ -157,7 +161,8 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             s3url = 'bucketA:xyz',
-            metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'}
+            metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'},
+            tags = ['one two'],
         )
         resp = self.client.post("/media", json=payload)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
@@ -165,7 +170,6 @@ class MediaApiTest(TestCase):
         PK = received1['pk']
         payload2 = dict(pid=PID2,
                         pid_type='DEMO',
-                        s3url='bucketB:abc',
                         identifiers={'DEMO2':'newvalue'},
                         metadata={'EGG':'NOG','zip':'ZAP'})
 
@@ -181,9 +185,10 @@ class MediaApiTest(TestCase):
             pk = PK,
             pid = PID2,
             pid_type = 'DEMO',
-            s3url = 'bucketB:abc',
+            s3url = '',
             identifiers = {'DEMO2':'newvalue'},
-            metadata = {'EGG':'NOG', 'zip':'ZAP'}
+            metadata = {'EGG':'NOG', 'zip':'ZAP'},
+            tags = [],
         )
 
         expected = ordered(expected)

@@ -14,6 +14,7 @@ class MediaSchema(Schema):
     s3url: str
     identifiers: dict
     metadata: dict
+    tags: List[str] = []
 
 class MediaSchemaCreate(Schema):
     pid: str
@@ -21,13 +22,15 @@ class MediaSchemaCreate(Schema):
     s3url: Optional[str] = ''
     identifiers: Optional[dict] = {}
     metadata: Optional[dict] = {}
+    tags: Optional[List[str]] = []
 
 class MediaSchemaPatch(Schema):
     pid: Optional[str] = None
     pid_type: Optional[str] = None
-    s3url: Optional[str] = None
-    identifiers: Optional[dict] = None
-    metadata: Optional[dict] = None
+    s3url: Optional[str] = ''
+    identifiers: Optional[dict] = {}
+    metadata: Optional[dict] = {}
+    tags: Optional[List[str]] = []
 
 def clean_identifiers(payload, media_obj=None):
     pop_me = None

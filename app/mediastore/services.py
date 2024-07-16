@@ -15,12 +15,21 @@ class MediaService:
             s3url = media.s3url,
             identifiers = media.identifiers,
             metadata = media.metadata,
+            tags = media.tags.names()
         )
 
     @staticmethod
     def create(payload: MediaSchemaCreate) -> MediaSchema:
         clean_identifiers(payload)
-        media = Media.objects.create( **payload.dict() )
+        #tags = payload.pop('tags')
+        media = Media.objects.create(
+            pid = payload.pid,
+            pid_type = payload.pid_type,
+            s3url = payload.s3url,
+            identifiers = clean_identifiers(payload),
+            metadata = payload.metadata,
+        )
+        media.tags.set(payload.tags)
         return MediaService.serialize(media)
 
     @staticmethod
@@ -44,6 +53,7 @@ class MediaService:
         media.identifiers = clean_identifiers(payload)
         media.metadata = payload.metadata
         media.save()
+        media.tags.set(payload.tags)
 
     @staticmethod
     def patch(pid: str, payload: MediaSchemaPatch) -> None:
@@ -60,6 +70,8 @@ class MediaService:
         if payload.metadata:
             media.metadata.update(**payload.metadata)
         media.save()
+        if payload.tags:
+            media.tags.add(*payload.tags)
 
     @staticmethod
     def delete(pid: str) -> None:
