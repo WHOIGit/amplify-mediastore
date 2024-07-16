@@ -1,91 +1,69 @@
 from django.db import transaction
-from mediastore.models import Media, Identity
-from mediastore.schemas import MediaSchema
+from mediastore.models import Media, IdentityType
+from mediastore.schemas import MediaSchema, MediaSchemaCreate, MediaSchemaPatch
+from mediastore.schemas import clean_identifiers
+
 
 class MediaService:
 
     @staticmethod
     def serialize(media: Media) -> MediaSchema:
         return MediaSchema(
-            ids=media.ids.all(),
-            metadata=media.metadata
+            pk = media.pk,
+            pid = media.pid,
+            pid_type = media.pid_type,
+            s3url = media.s3url,
+            identifiers = media.identifiers,
+            metadata = media.metadata,
         )
 
     @staticmethod
-    def create(media_input: MediaSchema) -> MediaSchema:
-        with transaction.atomic():
-            media = Media.objects.create(
-                metadata=media_input.metadata
-            )
-            for ident_schema in media_input.ids:
-                #print(ident_schema.dict())
-                ident_obj = Identity.objects.create(
-                    type = ident_schema.type,
-                    token = ident_schema.token,
-                    media = media,
-                    is_pid = ident_schema.is_pid if hasattr(ident_schema,'is_pid') else False)
-            media.clean()
+    def create(payload: MediaSchemaCreate) -> MediaSchema:
+        clean_identifiers(payload)
+        media = Media.objects.create( **payload.dict() )
         return MediaService.serialize(media)
 
     @staticmethod
-    def read(id: str) -> MediaSchema:
-        media = Identity.objects.select_related('media').get(token=id).media
+    def read(pid: str) -> MediaSchema:
+        media = Media.objects.get(pid=pid)
         return MediaService.serialize(media)
 
     @staticmethod
-    def put(pid: str, media_input: MediaSchema) -> str:
-        #media = Identity.objects.get(token=pid, is_pid=True).select_related('media').media
-        media = Media.objects.filter(ids__is_pid=True, ids__token=pid)
-        if media_input.metadata: media.update(metadata=media_input.metadata)
-        media = media.first()
-        extant_ids = Identity.objects.filter(media__id=media.id)
-        for extant_id in extant_ids:
-            keepme = False
-            for ident_schema in media_input.ids:
-                if extant_id.type == ident_schema.type and extant_id.token == ident_schema.token:
-                    keepme = True
-            if not keepme:
-                extant_id.delete()
-        extant_ids = Identity.objects.filter(media__id=media.id)
-        for ident_schema in media_input.ids:
-            extant_id = extant_ids.filter(type=ident_schema.type, token=ident_schema.token)
-            if extant_id.exists():
-                extant_id.update(ident_schema)
-            else:
-                ident_obj = Identity.objects.create(
-                    type=ident_schema.type,
-                    token=ident_schema.token,
-                    media=media,
-                    is_pid=ident_schema.is_pid if hasattr(ident_schema, 'is_pid') else False)
-
-        return media
+    def update(pid, payload: MediaSchemaPatch, putorpatch:str = 'patch') -> None:
+        if putorpatch=='put':
+            return MediaService.put(pid, payload)
+        else:
+            return MediaService.patch(pid, payload)
 
     @staticmethod
-    def patch(pid: str, media_input: MediaSchema) -> str:
-        #media = Identity.objects.get(token=pid, is_pid=True).select_related('media').media
-        media = Media.objects.filter(ids__is_pid=True, ids__token=pid).first()
-        media.metadata.update(**media_input.metadata)
+    def put(pid: str, payload: MediaSchemaPatch) -> None:
+        media = Media.objects.get(pid=pid)
+        media.pid = payload.pid
+        media.pid_type = payload.pid_type
+        media.s3url = payload.s3url
+        media.identifiers = clean_identifiers(payload)
+        media.metadata = payload.metadata
         media.save()
 
-        extant_ids = Identity.objects.filter(media__id=media.id)
-        for ident_schema in media_input.ids:
-            extant_id = extant_ids.filter(type=ident_schema.type, token=ident_schema.token)
-            if extant_id.exists():
-                extant_id = extant_id.first()
-                extant_id.is_pid = ident_schema.is_pid
-                extant_id.save()
-            else:
-                ident_obj = Identity.objects.create(
-                    type=ident_schema.type,
-                    token=ident_schema.token,
-                    media=media,
-                    is_pid=ident_schema.is_pid if hasattr(ident_schema, 'is_pid') else False)
-
-        return media
+    @staticmethod
+    def patch(pid: str, payload: MediaSchemaPatch) -> None:
+        media = Media.objects.get(pid=pid)
+        if payload.pid:
+            media.pid = payload.pid
+        if payload.pid_type:
+            media.pid_type = payload.pid_type
+        if payload.s3url:
+            media.s3url = payload.s3url
+        if payload.identifiers:
+            clean_identifiers(payload, media_obj=media)
+            media.identifiers.update(**payload.identifiers)
+        if payload.metadata:
+            media.metadata.update(**payload.metadata)
+        media.save()
 
     @staticmethod
     def delete(pid: str) -> None:
-        media = Identity.objects.select_related('media').get(token=pid).media
+        media = Media.objects.get(pid=pid)
         return media.delete()
 
     @staticmethod

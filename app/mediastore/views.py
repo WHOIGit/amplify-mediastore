@@ -1,6 +1,6 @@
 from ninja import NinjaAPI
 
-from mediastore.schemas import MediaSchema
+from mediastore.schemas import MediaSchema, MediaSchemaCreate, MediaSchemaPatch
 from mediastore.services import MediaService
 
 api = NinjaAPI()
@@ -10,30 +10,26 @@ api = NinjaAPI()
 def hello(request):
     return {"msg": "Hello, world!"}
 
-
 @api.get('/media', response=list[MediaSchema])
 def list_media(request):
     return MediaService.list()
 
-
 @api.post('/media', response=MediaSchema)
-def create_media(request, media: MediaSchema):
+def create_media(request, media: MediaSchemaCreate):
     return MediaService.create(media)
-
 
 @api.get('/media/{pid}', response=MediaSchema)
 def read_media(request, pid: str):
     return MediaService.read(pid)
 
-
-@api.put('/media/{pid}', response={204: int})
-def put_media(request, pid: str, media: MediaSchema):
-    MediaService.put(pid, media)
+@api.patch('/media/{pid}', response={204: int})
+def patch_media(request, pid: str, media: MediaSchemaPatch):
+    MediaService.patch(pid, media)
     return 204
 
-@api.patch('/media/{pid}', response={204: int})
-def patch_media(request, pid: str, media: MediaSchema):
-    MediaService.patch(pid, media)
+@api.put('/media/{pid}', response={204: int})
+def put_media(request, pid: str, media: MediaSchemaPatch):
+    MediaService.put(pid, media)
     return 204
 
 @api.delete('/media/{pid}', response={204: int})
