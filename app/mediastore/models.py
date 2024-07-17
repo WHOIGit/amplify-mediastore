@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from taggit.managers import TaggableManager
+from simple_history.models import HistoricalRecords
 
 class Tag(models.Model):
     tag = models.CharField(max_length=255)
@@ -20,7 +21,8 @@ class Media(models.Model):
     identifiers = models.JSONField(default=dict)
     metadata = models.JSONField(default=dict)
     tags = TaggableManager()
-    # TODO lifecycle Tags, Version, other relationships
+    history = HistoricalRecords()
+    # TODO lifecycle, other relationships
 
     def __str__(self):
         return f'{self.pid_type}:{self.pid}'

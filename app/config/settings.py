@@ -44,6 +44,7 @@ THIRD_PARTY_APPS = [
 #    'psycopg',
     'ninja',
     'taggit',
+    'simple_history',
     ]
 
 LOCAL_APPS = [
@@ -60,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    #'simple_history.middleware.HistoryRequestMiddleware',  # populate the history user automatically
 ]
 
 ROOT_URLCONF = 'config.urls'

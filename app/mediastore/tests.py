@@ -1,4 +1,7 @@
 import os
+
+from .models import Media
+
 os.environ["NINJA_SKIP_REGISTRY"] = "yes"
 import json
 
@@ -152,6 +155,7 @@ class MediaApiTest(TestCase):
 
         expected = ordered(expected)
         self.assertEqual(received3, expected, msg=f'{received3} != {expected}')
+        return PK
 
 
     def test_create_put(self):
@@ -193,3 +197,63 @@ class MediaApiTest(TestCase):
 
         expected = ordered(expected)
         self.assertEqual(received3, expected, msg=f'{received3} != {expected}')
+        return PK
+
+
+
+
+class MediaVersioningTest(TestCase):
+
+    def setUp(self):
+        self.client = TestClient(api)
+
+    def test_hello(self):
+        response = self.client.get("/hello")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"msg": "Hello, world!"})
+
+    def test_Versioning_patch(self):
+        PK = MediaApiTest.test_create_patch(self)
+        media = Media.objects.get(pk=PK)
+        m1 = media.history.earliest()   # first one   .first() not correrct
+        m2 = media.history.latest()     # most recent .last() not correct
+        self.assertEqual(m1.s3url, 'bucketA:xyz')
+        self.assertEqual(m2.s3url, 'bucketB:abc')
+
+        self.assertEqual(m1.metadata, {'egg':'nog', 'zip':'zap', 'quick':'quack'})
+        self.assertEqual(m2.metadata, {'egg':'nog', 'EGG':'NOG', 'zip':'ZAP', 'quick':'quack'} )
+
+        model_diff = m2.diff_against(m1)  # NEWER INSTANCE diff_against OLDER INSTANCE
+        expected_changed_fields = sorted(['s3url','identifiers','metadata'])  # tags is foreign key and not diff'd
+        self.assertEqual(sorted(model_diff.changed_fields), expected_changed_fields )
+
+        metadata_changes = [modelchange for modelchange in model_diff.changes if modelchange.field=='metadata'][0]
+        dict_diff = set(metadata_changes.new.items()) - set(metadata_changes.old.items())
+        expected = {'EGG':'NOG','zip':'ZAP'}   # the PATCH that was used
+        self.assertEqual(dict_diff, set(expected.items()))
+
+        # METADATA dict COMPARE WORKS FOR PATCH (additive) BUT NOT PUT
+        # for true comparison need "new KEYs (and val)"  "changed key:VALs"  "removed KEYs (and val)"
+        # and that's out of scope for rn
+
+    def test_Versioning_put(self):
+        PK = MediaApiTest.test_create_put(self)
+        media = Media.objects.get(pk=PK)
+        m1 = media.history.earliest()   # first one   .first() not correrct
+        m2 = media.history.latest()     # most recent .last() not correct
+        self.assertEqual(m1.pid, 'm7', msg=m1)
+        self.assertEqual(m2.pid, 'm77', msg=m2)
+
+        model_diff = m2.diff_against(m1)  # NEWER INSTANCE diff_against OLDER INSTANCE
+        expected_changed_fields = sorted(['pid','s3url','identifiers','metadata'])  # tags is foreign key and not diff'd
+        self.assertEqual(sorted(model_diff.changed_fields), expected_changed_fields )
+
+        # METADATA dict COMPARE WORKS FOR PATCH (additive) BUT NOT PUT
+        # for true comparison need "new KEYs (and val)"  "changed key:VALs"  "removed KEYs (and val)"
+        # and that's out of scope for rn
+
+        #metadata_changes = [modelchange for modelchange in model_diff.changes if modelchange.field=='metadata'][0]
+        #dict_diff = set(metadata_changes.new.items()) - set(metadata_changes.old.items())
+        #expected = {'EGG':'NOG','zip':'ZAP'}   # the PUT that was used
+        #self.assertEqual(dict_diff, set(expected.items()))
+        #self.assertEqual(metadata_changes.old, metadata_changes.new)

@@ -2,3 +2,4 @@ django
 psycopg[binary]
 django-ninja
 django-taggit
+django-simple-history
