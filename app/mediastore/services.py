@@ -21,12 +21,12 @@ class MediaService:
     @staticmethod
     def create(payload: MediaSchemaCreate) -> MediaSchema:
         clean_identifiers(payload)
-        #tags = payload.pop('tags')
+
         media = Media.objects.create(
             pid = payload.pid,
             pid_type = payload.pid_type,
             s3url = payload.s3url,
-            identifiers = clean_identifiers(payload),
+            identifiers = payload.identifiers, # already cleaned
             metadata = payload.metadata,
         )
         media.tags.set(payload.tags)

@@ -1,7 +1,5 @@
 import os
 
-from .models import Media
-
 os.environ["NINJA_SKIP_REGISTRY"] = "yes"
 import json
 
@@ -9,6 +7,8 @@ from django.test import TestCase, Client
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.db.utils import IntegrityError
 from ninja.testing import TestClient
+
+from .models import Media, IdentityType
 
 from .views import api
 
@@ -25,6 +25,9 @@ class MediaApiTest(TestCase):
 
     def setUp(self):
         self.client = TestClient(api)
+        IdentityType.objects.create(name='DEMO')
+        IdentityType.objects.create(name='BIN')
+        IdentityType.objects.create(name='DEMO2')
 
     def test_hello(self):
         response = self.client.get("/hello")
@@ -205,7 +208,7 @@ class MediaApiTest(TestCase):
 class MediaVersioningTest(TestCase):
 
     def setUp(self):
-        self.client = TestClient(api)
+        MediaApiTest.setUp(self)
 
     def test_hello(self):
         response = self.client.get("/hello")

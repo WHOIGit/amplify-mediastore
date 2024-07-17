@@ -1,6 +1,6 @@
 from typing import List, Optional
 from ninja import Schema
-
+from mediastore.models import IdentityType
 
 class IdentitySchema(Schema):
     media_pk: int
@@ -36,12 +36,12 @@ def clean_identifiers(payload, media_obj=None):
     pop_me = None
     if media_obj: pid,pid_type = payload.pid, media_obj.pid_type
     else:         pid, pid_type = payload.pid, payload.pid_type
+    assert IdentityType.objects.filter(name=pid_type).exists()
     for key,val in payload.identifiers.items():
         assert isinstance(key,str) and isinstance(val,str)
-        # TODO key in IdentityTypes, val formatting correct
+        assert IdentityType.objects.filter(name=key).exists()
         if key == pid_type:
             assert val == pid, f'duplicate pid_type in identifiers DO NOT MATCH: media[{pid_type}]:{pid} =! identifier[{key}]:{val}'
             pop_me=key
-    #assert payload.pid_type in IdentityType.objects.all().values_list('name',flat=True)
     if pop_me: payload.identifiers.pop(pop_me)
     return payload.identifiers
