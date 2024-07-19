@@ -1,6 +1,7 @@
 from ninja import NinjaAPI
+from ninja.errors import HttpError
 
-from mediastore.schemas import MediaSchema, MediaSchemaCreate, MediaSchemaPatch
+from mediastore.schemas import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate
 from mediastore.services import MediaService
 
 api = NinjaAPI()
@@ -23,12 +24,12 @@ def read_media(request, pid: str):
     return MediaService.read(pid)
 
 @api.patch('/media/{pid}', response={204: int})
-def patch_media(request, pid: str, media: MediaSchemaPatch):
+def patch_media(request, pid: str, media: MediaSchemaUpdate):
     MediaService.patch(pid, media)
     return 204
 
 @api.put('/media/{pid}', response={204: int})
-def put_media(request, pid: str, media: MediaSchemaPatch):
+def put_media(request, pid: str, media: MediaSchemaUpdate):
     MediaService.put(pid, media)
     return 204
 

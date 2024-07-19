@@ -1,11 +1,11 @@
 from typing import List, Optional
+from typing_extensions import Self
+
 from ninja import Schema
+from pydantic import BaseModel, ValidationError, model_validator, field_validator, ValidationInfo
+
 from mediastore.models import IdentityType
 
-class IdentitySchema(Schema):
-    media_pk: int
-    type: str
-    token: str
 
 class MediaSchema(Schema):
     pk: int
@@ -24,24 +24,18 @@ class MediaSchemaCreate(Schema):
     metadata: Optional[dict] = {}
     tags: Optional[List[str]] = []
 
-class MediaSchemaPatch(Schema):
+    @field_validator('identifiers')
+    @classmethod
+    def check_identifiers(cls, identifiers: dict) -> dict:
+        for key,val in identifiers.items():
+            assert isinstance(key,str), 'IdentifierType (dict key) must be string'
+            assert isinstance(val,str), 'Identifier (dict val) must be string'
+        return identifiers
+
+class MediaSchemaUpdate(MediaSchemaCreate):
     pid: Optional[str] = None
     pid_type: Optional[str] = None
     s3url: Optional[str] = ''
     identifiers: Optional[dict] = {}
     metadata: Optional[dict] = {}
     tags: Optional[List[str]] = []
-
-def clean_identifiers(payload, media_obj=None):
-    pop_me = None
-    if media_obj: pid,pid_type = payload.pid, media_obj.pid_type
-    else:         pid, pid_type = payload.pid, payload.pid_type
-    assert IdentityType.objects.filter(name=pid_type).exists()
-    for key,val in payload.identifiers.items():
-        assert isinstance(key,str) and isinstance(val,str)
-        assert IdentityType.objects.filter(name=key).exists()
-        if key == pid_type:
-            assert val == pid, f'duplicate pid_type in identifiers DO NOT MATCH: media[{pid_type}]:{pid} =! identifier[{key}]:{val}'
-            pop_me=key
-    if pop_me: payload.identifiers.pop(pop_me)
-    return payload.identifiers

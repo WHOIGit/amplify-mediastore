@@ -38,7 +38,7 @@ class MediaApiTest(TestCase):
         resp = self.client.get("/media")
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
 
-    def test_MediaService_create_id1(self):
+    def test_MediaService_create(self):
         PID = 'm1'
         payload = dict(
             pid = PID,
@@ -49,7 +49,7 @@ class MediaApiTest(TestCase):
         resp = self.client.post("/media", json=payload)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
 
-    def test_MediaService_create_id2(self):
+    def test_MediaService_create_minimal(self):
         # minimal create
         PID = 'm2'
         payload = dict(
@@ -59,7 +59,7 @@ class MediaApiTest(TestCase):
         resp = self.client.post("/media", json=payload)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
 
-    def test_MediaService_create_id3_dupeIDs(self):
+    def test_MediaService_create_dupeIDs(self):
         PID = 'm3'
         payload = dict(
             pid = PID,
@@ -84,7 +84,52 @@ class MediaApiTest(TestCase):
         expected = ordered(expected)
         self.assertEqual(received, expected, msg=f'{received} != {expected}')
 
-    def test_MediaService_create_id4_once(self):
+    def test_MediaService_create_dupeIDs_ambiguous(self):
+        PID = 'm33'
+        payload = dict(
+            pid = PID,
+            pid_type = 'DEMO',
+            identifiers = {'DEMO': f'not the {PID}', # this is different from above
+                           'BIN': 'bin_xyz'},
+        )
+        resp = self.client.post("/media", json=payload)
+        self.assertNotEqual(resp.status_code, 200, msg=resp.content.decode())
+
+    def test_MediaService_create_bad_identifiers(self):
+        PID = 'm333'
+        payload = dict(
+            pid = PID,
+            pid_type = 'DEMO',
+            identifiers = {'BIN': 123},
+        )
+        resp = self.client.post("/media", json=payload)
+        content = json.loads(resp.content.decode())
+        self.assertEqual(resp.status_code, 422, msg=content)
+        self.assertEqual(content["detail"][0]["ctx"]["error"], "Identifier (dict val) must be string")
+
+    def test_MediaService_create_bad_identifier_types(self):
+        PID = 'm3333'
+        payload = dict(
+            pid = PID,
+            pid_type = 'DEMOxxx',
+            identifiers = {'BIN': '123'},
+        )
+        resp = self.client.post("/media", json=payload)
+        content = json.loads(resp.content.decode())
+        self.assertEqual(resp.status_code, 422, msg=content)
+        self.assertEqual(content["detail"][0]["error"], "bad pid_type: DEMOxxx", content["detail"])
+
+        payload = dict(
+            pid = PID,
+            pid_type = 'DEMO',
+            identifiers = {'BINxxx': '123'},
+        )
+        resp = self.client.post("/media", json=payload)
+        content = json.loads(resp.content.decode())
+        self.assertEqual(resp.status_code, 422, msg=content)
+        self.assertEqual(content["detail"][0]["error"], "bad identifier_type: BINxxx", content["detail"])
+
+    def test_MediaService_create_uniquecheck(self):
         PID = 'm4'
         payload = dict(
             pid = PID,
@@ -139,8 +184,7 @@ class MediaApiTest(TestCase):
                         tags = ['two', 'three'],)
 
         resp2 = self.client.patch(f'/media/{PID}', json=payload2)
-        self.assertEqual(resp.status_code, 200, msg=resp2.content.decode())  # TODO why status_code != 204 ?
-        #self.assertEqual(resp.status_code, 204, msg=resp2.content.decode())  # TODO why status_code != 204 ?
+        self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
         resp3 = self.client.get(f'/media/{PID}')
         self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
         received3 = json.loads( resp3.content.decode() )
@@ -181,8 +225,48 @@ class MediaApiTest(TestCase):
                         metadata={'EGG':'NOG','zip':'ZAP'})
 
         resp2 = self.client.put(f'/media/{PID}', json=payload2)
-        self.assertEqual(resp.status_code, 200, msg=resp2.content.decode())  # TODO why status_code != 204 ?
-        #self.assertEqual(resp.status_code, 204, msg=resp2.content.decode())  # TODO why status_code != 204 ?
+        self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
+        resp3 = self.client.get(f'/media/{PID2}')
+        self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
+        received3 = json.loads( resp3.content.decode() )
+        received3 = ordered(received3)
+
+        expected = dict(
+            pk = PK,
+            pid = PID2,
+            pid_type = 'DEMO',
+            s3url = '',
+            identifiers = {'DEMO2':'newvalue'},
+            metadata = {'EGG':'NOG', 'zip':'ZAP'},
+            tags = [],
+        )
+
+        expected = ordered(expected)
+        self.assertEqual(received3, expected, msg=f'{received3} != {expected}')
+        return PK
+
+    def test_create_put_dupeidentifier(self):
+        PID = 'm7'
+        PID2 = 'm77'
+        payload = dict(
+            pid = PID,
+            pid_type = 'DEMO',
+            s3url = 'bucketA:xyz',
+            metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'},
+            tags = ['one two'],
+        )
+        resp = self.client.post("/media", json=payload)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        received1 =  json.loads( resp.content.decode() )
+        PK = received1['pk']
+        payload2 = dict(pid=PID2,
+                        pid_type='DEMO',
+                        identifiers={'DEMO2':'newvalue',
+                                     'DEMO':PID2},  # difference vs. test_create_put
+                        metadata={'EGG':'NOG','zip':'ZAP'})
+
+        resp2 = self.client.put(f'/media/{PID}', json=payload2)
+        self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
         resp3 = self.client.get(f'/media/{PID2}')
         self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
         received3 = json.loads( resp3.content.decode() )
@@ -203,6 +287,57 @@ class MediaApiTest(TestCase):
         return PK
 
 
+    def test_create_patch_dupeidentifiers(self):
+        PID = 'm6'
+        payload = dict(
+            pid = PID,
+            pid_type = 'DEMO',
+        )
+        resp = self.client.post("/media", json=payload)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        received1 =  json.loads( resp.content.decode() )
+        PK = received1['pk']
+        payload2 = dict(identifiers={'DEMO2':'newvalue',
+                                     'DEMO':PID}, # difference vs. test_create_patch
+                        )
+
+        resp2 = self.client.patch(f'/media/{PID}', json=payload2)
+        self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
+        resp3 = self.client.get(f'/media/{PID}')
+        self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
+        received3 = json.loads( resp3.content.decode() )
+        received3 = ordered(received3)
+
+        expected = dict(
+            pk = PK,
+            pid = PID,
+            pid_type = 'DEMO',
+            identifiers = {'DEMO2':'newvalue'},
+            s3url='',
+            metadata={},
+            tags=[],
+        )
+
+        expected = ordered(expected)
+        self.assertEqual(received3, expected, msg=f'{received3} != {expected}')
+        return PK
+
+
+    def test_create_patch_dupeidentifiers_AMBIGUOUS(self):
+        PID = 'm66'
+        payload = dict(
+            pid = PID,
+            pid_type = 'DEMO',
+        )
+        resp = self.client.post("/media", json=payload)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        received1 =  json.loads( resp.content.decode() )
+        PK = received1['pk']
+        payload2 = dict(identifiers = {'DEMO': f'not the {PID}', # this is different from test_create_patch_dupeidentifiers
+                                       'DEMO2':'newvalue',}
+                        )
+        resp2 = self.client.patch(f'/media/{PID}', json=payload2)
+        self.assertEqual(resp2.status_code, 422, msg=resp2.content.decode())
 
 
 class MediaVersioningTest(TestCase):
