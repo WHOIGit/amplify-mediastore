@@ -1,17 +1,31 @@
 from ninja import NinjaAPI
 from ninja.errors import HttpError
+from ninja.security import HttpBearer
 
 from mediastore.schemas import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate
-from mediastore.services import MediaService
+from mediastore.schemas import LoginInputDTO, TokenOutputDTO, ErrorDTO
+from mediastore.services import MediaService, AuthService
 
+class AuthBearer(HttpBearer):
+    def authenticate(self, request, token):
+        return AuthService.validate_token(token)
+
+auth = AuthBearer()
 api = NinjaAPI()
 
+
+@api.post("/login", response={200: TokenOutputDTO, 401: ErrorDTO})
+def login(request, login: LoginInputDTO):
+    token = AuthService.login(login.username, login.password)
+    if token:
+        return 200, TokenOutputDTO(token=token)
+    return 401, ErrorDTO(error="Invalid credentials")
 
 @api.get("/hello")
 def hello(request):
     return {"msg": "Hello, world!"}
 
-@api.get('/media', response=list[MediaSchema])
+@api.get('/medias', response=list[MediaSchema], auth=auth)
 def list_media(request):
     return MediaService.list()
 

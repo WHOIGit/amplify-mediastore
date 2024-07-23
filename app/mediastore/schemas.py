@@ -39,3 +39,14 @@ class MediaSchemaUpdate(MediaSchemaCreate):
     identifiers: Optional[dict] = {}
     metadata: Optional[dict] = {}
     tags: Optional[List[str]] = []
+
+
+class LoginInputDTO(Schema):
+    username: str
+    password: str
+
+class TokenOutputDTO(Schema):
+    token: str
+
+class ErrorDTO(Schema):
+    error: str

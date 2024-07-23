@@ -45,6 +45,7 @@ THIRD_PARTY_APPS = [
     'ninja',
     'taggit',
     'simple_history',
+    'rest_framework.authtoken',
     ]
 
 LOCAL_APPS = [

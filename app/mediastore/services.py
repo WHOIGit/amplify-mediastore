@@ -1,8 +1,13 @@
-from django.db import transaction
+from typing import Optional
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
+from django.core.exceptions import ObjectDoesNotExist
+from rest_framework.authtoken.models import Token
+from ninja.errors import ValidationError, HttpError
+
 from mediastore.models import Media, IdentityType
 from mediastore.schemas import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate
 
-from ninja.errors import ValidationError, HttpError
 
 class MediaService:
 
@@ -100,3 +105,21 @@ class MediaService:
                 pop_me = key
         if pop_me: payload.identifiers.pop(pop_me)
         return payload.identifiers
+
+class AuthService:
+    @staticmethod
+    def login(username: str, password: str) -> Optional[str]:
+        user = authenticate(username=username, password=password)
+        if user is not None and user.has_usable_password():
+            token, _ = Token.objects.get_or_create(user=user)
+            return token.key
+        return None
+
+    @staticmethod
+    def validate_token(token: str) -> Optional[User]:
+        try:
+            token_obj = Token.objects.get(key=token)
+            return token_obj.user
+        except ObjectDoesNotExist:
+            return None
+
