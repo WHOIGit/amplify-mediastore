@@ -31,10 +31,7 @@ class MediaApiTest(TestCase):
         IdentityType.objects.create(name='BIN')
         IdentityType.objects.create(name='DEMO2')
         self.user = User.objects.create_user(username='testuser', password='12345')
-        self.token = Token.objects.get_or_create(user=self.user)
-        #resp = self.client.post("/login", json=dict(username='testuser', password='12345'))
-        #self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
-        #self.token = resp.json()['token']
+        self.token = Token.objects.create(user=self.user)  # must be create, not get_or_create, for tests to work
         self.auth_headers = {'Authorization':f'Bearer {self.token}'}
 
     def test_hello(self):
@@ -42,9 +39,17 @@ class MediaApiTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"msg": "Hello, world!"})
 
-    def xtest_MediaService_list(self):
+    def test_MediaService_list(self):
         resp = self.client.get("/medias", headers=self.auth_headers)
-        self.assertEqual(resp.status_code, 200, msg=resp.content.decode()+' : '+self.token)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+
+    def test_usertoken(self):
+        user = User.objects.create_user(username='testuser2', password='uvwxyz')
+        resp = self.client.post("/login", json=dict(username='testuser2', password='uvwxyz'))
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        token = resp.json()['token']
+        resp2 = self.client.get("/medias", headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(resp2.status_code, 200, msg=resp2.content.decode())
 
     def test_MediaService_create(self):
         PID = 'm1'
@@ -54,7 +59,7 @@ class MediaApiTest(TestCase):
             s3url = 'bucketA:xyz',
             metadata = {'egg':'nog'},
             identifiers = {'BIN':'bin_xyz'} )
-        resp = self.client.post("/media", json=payload)
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
 
     def test_MediaService_create_minimal(self):
@@ -64,7 +69,7 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
         )
-        resp = self.client.post("/media", json=payload)
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
 
     def test_MediaService_create_dupeIDs(self):
@@ -82,11 +87,10 @@ class MediaApiTest(TestCase):
             metadata = {},
             tags = [],
         )
-        resp = self.client.post("/media", json=payload)
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
-        resp2 = self.client.get(f"/media/{PID}")
-        received = resp2.content.decode()
-        received = json.loads(received)
+        resp2 = self.client.get(f"/media/{PID}", headers=self.auth_headers)
+        received = resp2.json()
         received.pop('pk')
         received = ordered(received)
         expected = ordered(expected)
@@ -100,7 +104,7 @@ class MediaApiTest(TestCase):
             identifiers = {'DEMO': f'not the {PID}', # this is different from above
                            'BIN': 'bin_xyz'},
         )
-        resp = self.client.post("/media", json=payload)
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertNotEqual(resp.status_code, 200, msg=resp.content.decode())
 
     def test_MediaService_create_bad_identifiers(self):
@@ -110,8 +114,8 @@ class MediaApiTest(TestCase):
             pid_type = 'DEMO',
             identifiers = {'BIN': 123},
         )
-        resp = self.client.post("/media", json=payload)
-        content = json.loads(resp.content.decode())
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
+        content = resp.json()
         self.assertEqual(resp.status_code, 422, msg=content)
         self.assertEqual(content["detail"][0]["ctx"]["error"], "Identifier (dict val) must be string")
 
@@ -122,8 +126,8 @@ class MediaApiTest(TestCase):
             pid_type = 'DEMOxxx',
             identifiers = {'BIN': '123'},
         )
-        resp = self.client.post("/media", json=payload)
-        content = json.loads(resp.content.decode())
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
+        content = resp.json()
         self.assertEqual(resp.status_code, 422, msg=content)
         self.assertEqual(content["detail"][0]["error"], "bad pid_type: DEMOxxx", content["detail"])
 
@@ -132,8 +136,8 @@ class MediaApiTest(TestCase):
             pid_type = 'DEMO',
             identifiers = {'BINxxx': '123'},
         )
-        resp = self.client.post("/media", json=payload)
-        content = json.loads(resp.content.decode())
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
+        content = resp.json()  # json.loads(resp.content.decode())
         self.assertEqual(resp.status_code, 422, msg=content)
         self.assertEqual(content["detail"][0]["error"], "bad identifier_type: BINxxx", content["detail"])
 
@@ -144,7 +148,7 @@ class MediaApiTest(TestCase):
             pid_type = 'DEMO',
             s3url = 'bucketA:xyz',
         )
-        resp = self.client.post("/media", json=payload)
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
         demo2 = dict(
             pid = PID,
@@ -152,7 +156,7 @@ class MediaApiTest(TestCase):
             s3url = 'bucketA:xyz',
         )
         with self.assertRaises(IntegrityError):
-            resp2 = self.client.post("/media", json=demo2)
+            resp2 = self.client.post("/media", json=demo2, headers=self.auth_headers)
 
     def test_MediaService_create_read_delete(self):
         PID = 'm5'
@@ -161,16 +165,16 @@ class MediaApiTest(TestCase):
             pid_type = 'DEMO',
             s3url = 'bucketA:xyz',
         )
-        resp = self.client.post("/media", json=payload)
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
-        resp2 = self.client.get(f"/media/{PID}")
+        resp2 = self.client.get(f"/media/{PID}", headers=self.auth_headers)
         self.assertEqual(resp2.status_code, 200, msg=resp2.content.decode())
 
-        resp3 = self.client.delete(f"/media/{PID}")
+        resp3 = self.client.delete(f"/media/{PID}", headers=self.auth_headers)
         self.assertEqual(resp3.status_code, 204, msg=resp3.content.decode())
 
         with self.assertRaises(ObjectDoesNotExist):
-            resp4 = self.client.get(f"/media/{PID}")
+            resp4 = self.client.get(f"/media/{PID}", headers=self.auth_headers)
 
 
     def test_create_patch(self):
@@ -182,21 +186,20 @@ class MediaApiTest(TestCase):
             metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'},
             tags=['one', 'two'],
         )
-        resp = self.client.post("/media", json=payload)
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
-        received1 =  json.loads( resp.content.decode() )
+        received1 =  resp.json()
         PK = received1['pk']
         payload2 = dict(s3url='bucketB:abc',
                         identifiers={'DEMO2':'newvalue'},
                         metadata={'EGG':'NOG','zip':'ZAP'},
                         tags = ['two', 'three'],)
 
-        resp2 = self.client.patch(f'/media/{PID}', json=payload2)
+        resp2 = self.client.patch(f'/media/{PID}', json=payload2, headers=self.auth_headers)
         self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
-        resp3 = self.client.get(f'/media/{PID}')
+        resp3 = self.client.get(f'/media/{PID}', headers=self.auth_headers)
         self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
-        received3 = json.loads( resp3.content.decode() )
-        received3 = ordered(received3)
+        received3 = ordered(resp3.json())
 
         expected = dict(
             pk = PK,
@@ -223,21 +226,20 @@ class MediaApiTest(TestCase):
             metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'},
             tags = ['one two'],
         )
-        resp = self.client.post("/media", json=payload)
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
-        received1 =  json.loads( resp.content.decode() )
+        received1 =  resp.json()
         PK = received1['pk']
         payload2 = dict(pid=PID2,
                         pid_type='DEMO',
                         identifiers={'DEMO2':'newvalue'},
                         metadata={'EGG':'NOG','zip':'ZAP'})
 
-        resp2 = self.client.put(f'/media/{PID}', json=payload2)
+        resp2 = self.client.put(f'/media/{PID}', json=payload2, headers=self.auth_headers)
         self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
-        resp3 = self.client.get(f'/media/{PID2}')
+        resp3 = self.client.get(f'/media/{PID2}', headers=self.auth_headers)
         self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
-        received3 = json.loads( resp3.content.decode() )
-        received3 = ordered(received3)
+        received3 = ordered(resp3.json())
 
         expected = dict(
             pk = PK,
@@ -263,9 +265,9 @@ class MediaApiTest(TestCase):
             metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'},
             tags = ['one two'],
         )
-        resp = self.client.post("/media", json=payload)
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
-        received1 =  json.loads( resp.content.decode() )
+        received1 =  resp.json()
         PK = received1['pk']
         payload2 = dict(pid=PID2,
                         pid_type='DEMO',
@@ -273,12 +275,11 @@ class MediaApiTest(TestCase):
                                      'DEMO':PID2},  # difference vs. test_create_put
                         metadata={'EGG':'NOG','zip':'ZAP'})
 
-        resp2 = self.client.put(f'/media/{PID}', json=payload2)
+        resp2 = self.client.put(f'/media/{PID}', json=payload2, headers=self.auth_headers)
         self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
-        resp3 = self.client.get(f'/media/{PID2}')
+        resp3 = self.client.get(f'/media/{PID2}', headers=self.auth_headers)
         self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
-        received3 = json.loads( resp3.content.decode() )
-        received3 = ordered(received3)
+        received3 = ordered(resp3.json())
 
         expected = dict(
             pk = PK,
@@ -301,20 +302,19 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
         )
-        resp = self.client.post("/media", json=payload)
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
-        received1 =  json.loads( resp.content.decode() )
+        received1 =  resp.json()
         PK = received1['pk']
         payload2 = dict(identifiers={'DEMO2':'newvalue',
                                      'DEMO':PID}, # difference vs. test_create_patch
                         )
 
-        resp2 = self.client.patch(f'/media/{PID}', json=payload2)
+        resp2 = self.client.patch(f'/media/{PID}', json=payload2, headers=self.auth_headers)
         self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
-        resp3 = self.client.get(f'/media/{PID}')
+        resp3 = self.client.get(f'/media/{PID}', headers=self.auth_headers)
         self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
-        received3 = json.loads( resp3.content.decode() )
-        received3 = ordered(received3)
+        received3 = ordered(resp3.json())
 
         expected = dict(
             pk = PK,
@@ -337,14 +337,14 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
         )
-        resp = self.client.post("/media", json=payload)
+        resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
-        received1 =  json.loads( resp.content.decode() )
+        received1 =  resp.json()
         PK = received1['pk']
         payload2 = dict(identifiers = {'DEMO': f'not the {PID}', # this is different from test_create_patch_dupeidentifiers
                                        'DEMO2':'newvalue',}
                         )
-        resp2 = self.client.patch(f'/media/{PID}', json=payload2)
+        resp2 = self.client.patch(f'/media/{PID}', json=payload2, headers=self.auth_headers)
         self.assertEqual(resp2.status_code, 422, msg=resp2.content.decode())
 
 
@@ -352,11 +352,6 @@ class MediaVersioningTest(TestCase):
 
     def setUp(self):
         MediaApiTest.setUp(self)
-
-    def test_hello(self):
-        response = self.client.get("/hello")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"msg": "Hello, world!"})
 
     def test_Versioning_patch(self):
         PK = MediaApiTest.test_create_patch(self)

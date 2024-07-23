@@ -11,21 +11,21 @@ class AuthBearer(HttpBearer):
         return AuthService.validate_token(token)
 
 auth = AuthBearer()
-api = NinjaAPI()
+api = NinjaAPI(auth=auth)
 
 
-@api.post("/login", response={200: TokenOutputDTO, 401: ErrorDTO})
+@api.post("/login", response={200: TokenOutputDTO, 401: ErrorDTO}, auth=None)
 def login(request, login: LoginInputDTO):
     token = AuthService.login(login.username, login.password)
     if token:
         return 200, TokenOutputDTO(token=token)
     return 401, ErrorDTO(error="Invalid credentials")
 
-@api.get("/hello")
+@api.get("/hello", auth=None)
 def hello(request):
     return {"msg": "Hello, world!"}
 
-@api.get('/medias', response=list[MediaSchema], auth=auth)
+@api.get('/medias', response=list[MediaSchema])
 def list_media(request):
     return MediaService.list()
 
