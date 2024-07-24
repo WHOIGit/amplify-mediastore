@@ -30,8 +30,8 @@ class MediaApiTest(TestCase):
         IdentityType.objects.create(name='DEMO')
         IdentityType.objects.create(name='BIN')
         IdentityType.objects.create(name='DEMO2')
-        self.user = User.objects.create_user(username='testuser', password='12345')
-        self.token = Token.objects.create(user=self.user)  # must be create, not get_or_create, for tests to work
+        self.user, created_user = User.objects.get_or_create(username='testuser', password='12345')
+        self.token, created_token = Token.objects.get_or_create(user=self.user)
         self.auth_headers = {'Authorization':f'Bearer {self.token}'}
 
     def test_hello(self):
