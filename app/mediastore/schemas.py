@@ -1,10 +1,7 @@
 from typing import List, Optional
-from typing_extensions import Self
 
 from ninja import Schema
 from pydantic import BaseModel, ValidationError, model_validator, field_validator, ValidationInfo
-
-from mediastore.models import IdentityType
 
 
 class MediaSchema(Schema):

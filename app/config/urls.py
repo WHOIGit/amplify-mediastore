@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path
 
 from mediastore.views import api
+    # includes file_handler.views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
