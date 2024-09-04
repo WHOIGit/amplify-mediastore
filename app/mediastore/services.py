@@ -5,19 +5,59 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.authtoken.models import Token
 from ninja.errors import ValidationError, HttpError
 
-from mediastore.models import Media, IdentityType
-from mediastore.schemas import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate
+from mediastore.models import Media, IdentityType, StoreConfig, S3Config
+from mediastore.schemas import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate, StoreConfigSchema, S3ConfigSchema
+
+
+class StoreService:
+    @staticmethod
+    def serialize_s3config(s3config: S3Config, with_secret:bool=False):
+        secret_key = s3config.secret_key if with_secret else False
+        return S3ConfigSchema(url=s3config.url, access_key=s3config.access_key, secret_ket=secret_key)
+
+    @staticmethod
+    def serialize(store_config: StoreConfig, with_secret:bool=False):
+        s3config = StoreService.serialize_s3config(store_config.s3_params, with_secret) if store_config.s3_params else None
+        return StoreConfigSchema(type=store_config.type, bucket=store_config.bucket, s3_params=s3config)
+
+    @staticmethod
+    def get_or_create(store_config: StoreConfigSchema):
+        StoreService.clean(store_config)
+        store_config, storeconfig_created = StoreConfig.objects.get_or_create(type=store_config.type, bucket=store_config.bucket)
+        s3config_created = None
+        if store_config.type == StoreConfig.BUCKETSTORE:
+            try:
+                s3config = S3Config.objects.get(url=store_config.s3_params.url, access_key=store_config.s3_params.access_key)
+                s3config_created = False
+            except ObjectDoesNotExist:
+                assert store_config.s3_params.secret_key, 'S3Config when created must include secret_key'
+                s3config = S3Config.objects.create(url=store_config.s3_params.url,
+                                     access_key=store_config.s3_params.access_key,
+                                     secret_key=store_config.s3_params.secret_key)
+                s3config_created = True
+            store_config.s3_params = s3config
+            store_config.save()
+        return store_config, storeconfig_created, s3config_created
+
+    @staticmethod
+    def clean(payload: StoreConfigSchema):
+        if payload.type == StoreConfig.BUCKETSTORE and payload.s3_params is None:
+            raise ValidationError([dict(error='type[BUCKETSTORE] must include s3_params')])
+        if payload.type != StoreConfig.BUCKETSTORE and payload.s3_params is not None:
+            raise ValidationError([dict(error='Only type[BUCKETSTORE] may include s3_params')])
+        return payload
 
 
 class MediaService:
-
     @staticmethod
     def serialize(media: Media) -> MediaSchema:
         return MediaSchema(
             pk = media.pk,
             pid = media.pid,
             pid_type = media.pid_type,
-            s3url = media.s3url,
+            store_config = StoreService.serialize(media.store_config),
+            store_key = media.store_key,
+            store_status = media.store_status,
             identifiers = media.identifiers,
             metadata = media.metadata,
             tags = media.tags.names()
@@ -27,10 +67,13 @@ class MediaService:
     def create(payload: MediaSchemaCreate) -> MediaSchema:
         MediaService.clean_identifiers(payload)
 
+        store_config,storeconfig_created,s3config_created = StoreService.get_or_create(payload.store_config)
         media = Media.objects.create(
             pid = payload.pid,
             pid_type = payload.pid_type,
-            s3url = payload.s3url,
+            store_config = store_config,
+            store_key = payload.store_key,
+            store_status = StoreConfig.PENDING,
             identifiers = payload.identifiers, # already cleaned
             metadata = payload.metadata,
         )
@@ -51,10 +94,12 @@ class MediaService:
 
     @staticmethod
     def put(pid: str, payload: MediaSchemaUpdate) -> None:
+        store_config,storeconfig_created,s3config_created = StoreService.get_or_create(payload.store_config)
         media = Media.objects.get(pid=pid)
         media.pid = payload.pid
         media.pid_type = payload.pid_type
-        media.s3url = payload.s3url
+        media.store_config = store_config
+        media.store_key = payload.store_key
         media.identifiers = MediaService.clean_identifiers(payload)
         media.metadata = payload.metadata
         media.save()
@@ -68,8 +113,11 @@ class MediaService:
             media.pid = payload.pid
         if payload.pid_type:
             media.pid_type = payload.pid_type
-        if payload.s3url:
-            media.s3url = payload.s3url
+        if payload.store_key:
+            media.store_key = payload.store_key
+        if payload.store_config:
+            store_config, storeconfig_created, s3config_created = StoreService.get_or_create(payload.store_config)
+            media.store_config = store_config
         if payload.identifiers:
             MediaService.clean_identifiers(payload, media_obj=media)  # because sometimes PID is not included
             media.identifiers.update(**payload.identifiers)
@@ -79,6 +127,8 @@ class MediaService:
         if payload.tags:
             media.tags.add(*payload.tags)
         return media
+
+    #TODO CRUD for metadata,identifiers,tags,store_status SPECIFICALLY
 
     @staticmethod
     def delete(pid: str) -> None:
@@ -105,6 +155,7 @@ class MediaService:
                 pop_me = key
         if pop_me: payload.identifiers.pop(pop_me)
         return payload.identifiers
+
 
 class AuthService:
     @staticmethod

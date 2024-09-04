@@ -10,7 +10,8 @@ from django.contrib.auth.models import User
 from ninja.testing import TestClient
 from rest_framework.authtoken.models import Token
 
-from .models import Media, IdentityType
+from .models import Media, IdentityType, StoreConfig
+from .schemas import StoreConfigSchema
 
 from .views import api
 
@@ -30,6 +31,7 @@ class MediaApiTest(TestCase):
         IdentityType.objects.create(name='DEMO')
         IdentityType.objects.create(name='BIN')
         IdentityType.objects.create(name='DEMO2')
+        self.demostore_dict = dict(StoreConfigSchema(type='FilesystemStore', bucket='/demobucket', s3_params=None))
         self.user, created_user = User.objects.get_or_create(username='testuser')
         self.token, created_token = Token.objects.get_or_create(user=self.user)
         self.auth_headers = {'Authorization':f'Bearer {self.token}'}
@@ -56,7 +58,8 @@ class MediaApiTest(TestCase):
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
-            s3url = 'bucketA:xyz',
+            store_config = self.demostore_dict,
+            store_key = 'bucketA:xyz',
             metadata = {'egg':'nog'},
             identifiers = {'BIN':'bin_xyz'} )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
@@ -68,6 +71,7 @@ class MediaApiTest(TestCase):
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
+            store_config = self.demostore_dict,
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
@@ -78,12 +82,15 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             identifiers = {'DEMO':PID, 'BIN':'bin_xyz'},
+            store_config = self.demostore_dict,
         )
         expected = dict(
             pid = PID,
             pid_type = 'DEMO',
             identifiers = {'BIN':'bin_xyz'},
-            s3url = '',
+            store_config=self.demostore_dict,
+            store_key = '',
+            store_status = StoreConfig.PENDING,
             metadata = {},
             tags = [],
         )
@@ -101,6 +108,7 @@ class MediaApiTest(TestCase):
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
+            store_config = self.demostore_dict,
             identifiers = {'DEMO': f'not the {PID}', # this is different from above
                            'BIN': 'bin_xyz'},
         )
@@ -112,6 +120,7 @@ class MediaApiTest(TestCase):
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
+            store_config = self.demostore_dict,
             identifiers = {'BIN': 123},
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
@@ -125,6 +134,7 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMOxxx',
             identifiers = {'BIN': '123'},
+            store_config = self.demostore_dict,
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         content = resp.json()
@@ -135,6 +145,7 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             identifiers = {'BINxxx': '123'},
+            store_config = self.demostore_dict,
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         content = resp.json()  # json.loads(resp.content.decode())
@@ -146,14 +157,16 @@ class MediaApiTest(TestCase):
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
-            s3url = 'bucketA:xyz',
+            store_config = self.demostore_dict,
+            store_key = 'bucketA:xyz',
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
         demo2 = dict(
             pid = PID,
             pid_type = 'DEMO',
-            s3url = 'bucketA:xyz',
+            store_config = self.demostore_dict,
+            store_key = 'bucketA:xyz',
         )
         with self.assertRaises(IntegrityError):
             resp2 = self.client.post("/media", json=demo2, headers=self.auth_headers)
@@ -163,7 +176,8 @@ class MediaApiTest(TestCase):
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
-            s3url = 'bucketA:xyz',
+            store_config = self.demostore_dict,
+            store_key = 'bucketA:xyz',
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
@@ -182,17 +196,19 @@ class MediaApiTest(TestCase):
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
-            s3url = 'bucketA:xyz',
+            store_config = self.demostore_dict,
+            store_key = 'bucketA:xyz',
             metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'},
-            tags=['one', 'two'],
+            tags = ['one', 'two'],
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
         received1 =  resp.json()
         PK = received1['pk']
-        payload2 = dict(s3url='bucketB:abc',
-                        identifiers={'DEMO2':'newvalue'},
-                        metadata={'EGG':'NOG','zip':'ZAP'},
+        payload2 = dict(store_config = self.demostore_dict,
+                        store_key = 'bucketB:abc',
+                        identifiers = {'DEMO2':'newvalue'},
+                        metadata = {'EGG':'NOG','zip':'ZAP'},
                         tags = ['two', 'three'],)
 
         resp2 = self.client.patch(f'/media/{PID}', json=payload2, headers=self.auth_headers)
@@ -205,7 +221,9 @@ class MediaApiTest(TestCase):
             pk = PK,
             pid = PID,
             pid_type = 'DEMO',
-            s3url = 'bucketB:abc',
+            store_config = self.demostore_dict,
+            store_key = 'bucketB:abc',
+            store_status = StoreConfig.PENDING,
             identifiers = {'DEMO2':'newvalue'},
             metadata = {'egg':'nog', 'EGG':'NOG', 'zip':'ZAP', 'quick':'quack'},
             tags = ['one', 'two', 'three'],
@@ -222,7 +240,8 @@ class MediaApiTest(TestCase):
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
-            s3url = 'bucketA:xyz',
+            store_config = self.demostore_dict,
+            store_key = 'bucketA:xyz',
             metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'},
             tags = ['one two'],
         )
@@ -232,6 +251,7 @@ class MediaApiTest(TestCase):
         PK = received1['pk']
         payload2 = dict(pid=PID2,
                         pid_type='DEMO',
+                        store_config=self.demostore_dict,
                         identifiers={'DEMO2':'newvalue'},
                         metadata={'EGG':'NOG','zip':'ZAP'})
 
@@ -245,7 +265,9 @@ class MediaApiTest(TestCase):
             pk = PK,
             pid = PID2,
             pid_type = 'DEMO',
-            s3url = '',
+            store_config = self.demostore_dict,
+            store_key = '',
+            store_status = StoreConfig.PENDING,
             identifiers = {'DEMO2':'newvalue'},
             metadata = {'EGG':'NOG', 'zip':'ZAP'},
             tags = [],
@@ -261,7 +283,8 @@ class MediaApiTest(TestCase):
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
-            s3url = 'bucketA:xyz',
+            store_config = self.demostore_dict,
+            store_key = 'bucketA:xyz',
             metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'},
             tags = ['one two'],
         )
@@ -271,6 +294,7 @@ class MediaApiTest(TestCase):
         PK = received1['pk']
         payload2 = dict(pid=PID2,
                         pid_type='DEMO',
+                        store_config=self.demostore_dict,
                         identifiers={'DEMO2':'newvalue',
                                      'DEMO':PID2},  # difference vs. test_create_put
                         metadata={'EGG':'NOG','zip':'ZAP'})
@@ -285,7 +309,9 @@ class MediaApiTest(TestCase):
             pk = PK,
             pid = PID2,
             pid_type = 'DEMO',
-            s3url = '',
+            store_config = self.demostore_dict,
+            store_key = '',
+            store_status = StoreConfig.PENDING,
             identifiers = {'DEMO2':'newvalue'},
             metadata = {'EGG':'NOG', 'zip':'ZAP'},
             tags = [],
@@ -301,6 +327,7 @@ class MediaApiTest(TestCase):
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
+            store_config = self.demostore_dict,
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
@@ -321,9 +348,11 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             identifiers = {'DEMO2':'newvalue'},
-            s3url='',
-            metadata={},
-            tags=[],
+            store_config = self.demostore_dict,
+            store_key = '',
+            store_status = StoreConfig.PENDING,
+            metadata = {},
+            tags = [],
         )
 
         expected = ordered(expected)
@@ -336,6 +365,7 @@ class MediaApiTest(TestCase):
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
+            store_config=self.demostore_dict,
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
