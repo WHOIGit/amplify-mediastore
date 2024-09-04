@@ -5,8 +5,8 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.authtoken.models import Token
 from ninja.errors import ValidationError, HttpError
 
-import amplify_amqp_utils as amqp_utils
-import amplify_storage_utils as storage_utils
+import amqp  # amplify_amqp_utils
+import storage  # amplify_storage_utils
 
 from file_handler.schemas import UploadSchemaInput, UploadSchemaOutput, UploadError, \
                                  DownloadSchemaInput, DownloadSchemaOutput, DownloadError
@@ -24,7 +24,7 @@ class UploadService:
             resp = UploadService.upload_sans_file(payload)
 
         if isinstance(resp, UploadSchemaOutput):
-            media = payload.metadata
+            media = payload.mediadata
             media = MediaService.create(media)
         return resp  # may include presigned url
 
@@ -32,7 +32,7 @@ class UploadService:
     @staticmethod
     def upload_with_file(payload: UploadSchemaInput) -> UploadSchemaOutput|UploadError:
         # TODO save the file with storage_util
-        return UploadSchemaOutput()
+        return UploadSchemaOutput(object_url=f'the_ready_object_url pid={payload.mediadata.pid} fname={payload.file.name}')
 
     @staticmethod
     def upload_sans_file(payload: UploadSchemaInput) -> UploadSchemaOutput|UploadError:
@@ -59,11 +59,11 @@ class DownloadService:
         metadata = MediaService.read(payload.pid)
         # TODO fetch file content with storage_util
         file = 'the_fetched_file'
-        return DownloadSchemaOutput(metadata=metadata, file = file)
+        return DownloadSchemaOutput(metadata=metadata, file=file)
 
     @staticmethod
     def download_link(payload: DownloadSchemaInput) -> DownloadSchemaOutput|DownloadError:
         metadata = MediaService.read(payload.pid)
         # TODO generate presigned url with storage_util
-        file = 'link_to_file'
-        return DownloadSchemaOutput(metadata=metadata, file = file)
+        object_url = 'link_to_file'
+        return DownloadSchemaOutput(metadata=metadata, object_url=object_url)
