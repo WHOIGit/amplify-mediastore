@@ -17,8 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
-from mediastore.views import api
-    # includes file_handler.views
+from .api import api
+    # includes mediastore and file_handler routes from *.views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
