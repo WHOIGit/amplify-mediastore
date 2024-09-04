@@ -93,7 +93,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db', 'db.sqlite3'),
+        'NAME': os.path.join('/db', 'db.sqlite3'),
         'OPTIONS': {'timeout': 2, }  # in seconds
 #        'ENGINE': 'django.db.backends.postgresql',
 #        'NAME': os.environ.get('POSTGRES_DB'),
