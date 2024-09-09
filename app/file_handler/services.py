@@ -1,4 +1,6 @@
+import base64
 from typing import Optional
+
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
@@ -7,6 +9,7 @@ from ninja.errors import ValidationError, HttpError
 
 import amqp  # amplify_amqp_utils
 import storage  # amplify_storage_utils
+import storage.fs, storage.s3, storage.db
 
 from file_handler.schemas import UploadSchemaInput, UploadSchemaOutput, UploadError, \
                                  DownloadSchemaInput, DownloadSchemaOutput, DownloadError
@@ -14,31 +17,33 @@ from mediastore.services import MediaService
 from mediastore.models import StoreConfig
 
 
+def b64_to_bytearray(b64_content:str):
+    return bytearray(base64.b64decode(b64_content))
+
+
 class UploadService:
 
     @staticmethod
     def upload(payload: UploadSchemaInput) -> UploadSchemaOutput|UploadError:
         # TODO provenance log file upload attempt with amqp_util
-        if payload.file:
-            resp = UploadService.upload_with_file(payload)
-        else:
-            resp = UploadService.upload_sans_file(payload)
-
-        if isinstance(resp, UploadSchemaOutput):
-            media = payload.mediadata
-            media = MediaService.create(media)
+        try: # todo atomic
+            if payload.base64:
+                resp = UploadService.upload_with_file(payload)
+            else:
+                resp = UploadService.upload_sans_file(payload)
+        except Exception as e:
+            resp = UploadError(error=f'{type(e)}: {e}')
         return resp  # may include presigned url
 
 
     @staticmethod
     def upload_with_file(payload: UploadSchemaInput) -> UploadSchemaOutput|UploadError:
         mediadata = MediaService.create(payload.mediadata)  # returns MediaSchema after creating database entry
-        # TODO verify that store_key is properly set or generated
         store_config = mediadata.store_config
         match store_config.type:
             case StoreConfig.FILESYSTEMSTORE:
-                with storage.fs.FilesystemStore(store_config.bucket) as store:
-                    store.put(mediadata.store_key, payload.file.read())
+                store = storage.fs.FilesystemStore(store_config.bucket)
+                store.put(mediadata.store_key, b64_to_bytearray(payload.base64))
             case StoreConfig.BUCKETSTORE:
                 s3_params = store_config.s3_params
                 s3_session = storage.s3.aiobotocore.session.get_session()
@@ -49,18 +54,21 @@ class UploadService:
                 )
                 with s3_session.create_client('s3', **S3_CLIENT_ARGS) as s3client:
                     with storage.s3.BucketStore(s3client, store_config.bucket) as store:
-                        store.put(mediadata.store_key, payload.file.read())
+                        store.put(mediadata.store_key, b64_to_bytearray(payload.base64))
             case StoreConfig.SQLITESTORE:
                 with storage.db.SqliteStore(store_config.bucket) as store:
-                    store.put(mediadata.store_key, payload.file.read())
+                    store.put(mediadata.store_key, b64_to_bytearray(payload.base64))
 
-        return UploadSchemaOutput(object_url=f'the_ready_object_url pid={payload.mediadata.pid} fname={payload.file.name}')
+        # set media object successful storage
+        MediaService.update_status(mediadata.pid, status=StoreConfig.READY)
+
+        return UploadSchemaOutput(status=StoreConfig.READY)
 
     @staticmethod
     def upload_sans_file(payload: UploadSchemaInput) -> UploadSchemaOutput|UploadError:
         assert payload.mediadata.store_config.type == StoreConfig.BUCKETSTORE
         # TODO generate presigned url with storage_util
-        return UploadSchemaOutput(presigned_url='my_presigned_url')
+        return UploadSchemaOutput(status=StoreConfig.PENDING, presigned_url='my_presigned_url')
 
 
 class DownloadService:

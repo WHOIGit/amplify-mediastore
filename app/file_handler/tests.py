@@ -1,4 +1,5 @@
 import os
+import base64
 
 from django.utils.datastructures import MultiValueDict
 
@@ -20,39 +21,36 @@ from rest_framework.authtoken.models import Token
 
 from config.api import api
 
-from mediastore.models import Media, IdentityType, StoreConfig
-from mediastore.schemas import MediaSchemaCreate,StoreConfigSchema
+from mediastore.models import Media, IdentityType, StoreConfig, S3Config
+from mediastore.schemas import MediaSchemaCreate,StoreConfigSchema, S3ConfigSchema
 
 from .schemas import UploadSchemaInput, UploadSchemaOutput, DownloadSchemaInput, DownloadSchemaOutput
 
+def encode64(content:bytes) -> str:
+    encoded = base64.b64encode(content)
+    return encoded.decode('ascii')
 
-def generate_file(filename, content: bytes = b'test text'):
-    file = io.BytesIO()
-    file.write(content)
-    file.name = filename
-    file.seek(0)
-    return file
-
+def decode64(content:str) -> bytes:
+    content = content.encode("ascii")
+    return base64.b64decode(content)
 
 class FileHandlerUploadTest(TestCase):
 
     def setUp(self):
         IdentityType.objects.create(name='DEMO')
-        self.filestore_dict = dict(StoreConfigSchema(type='FilesystemStore', bucket='/demobucket', s3_params=None))
+        self.filestore_dict = dict(StoreConfigSchema(type=StoreConfig.FILESYSTEMSTORE, bucket='/demobucket', s3_params=None))
         self.user, created_user = User.objects.get_or_create(username='testuser')
         self.token, created_token = Token.objects.get_or_create(user=self.user)
         self.auth_headers = {'Authorization':f'Bearer {self.token}'}
         self.client = TestClient(api, headers=self.auth_headers)
 
-
     def test_MediaService_create_minimal(self):
-        PID = 'demo_pid'
-        file = SimpleUploadedFile("test_file.txt", b"This is the content of the file.", content_type="text/plain")
+        PID = 'uploadPID'
         mediadata = dict(MediaSchemaCreate(
             pid = PID, pid_type = 'DEMO',
             store_config = self.filestore_dict))
-
-        resp = self.client.post("/upload", data=dict(media_schema_create=mediadata), FILES={'file':file})
-        # {"object_url": "the_ready_object_url pid=demo_pid fname=test_file.txt", "presigned_url": null}
+        filecontent = b'egg salad sand witch'
+        payload = dict(UploadSchemaInput(mediadata=mediadata, base64=encode64(filecontent)))
+        resp = self.client.post("/upload", json=payload)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
 

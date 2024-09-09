@@ -8,10 +8,10 @@ from mediastore.schemas import MediaSchemaCreate, MediaSchema
 ## Upload Schemas ##
 class UploadSchemaInput(Schema):
     mediadata: MediaSchemaCreate
-    file: UploadedFile = File(...)
+    base64: Optional[str] = ''
 
 class UploadSchemaOutput(Schema):
-    object_url: Optional[str] = None
+    status: str
     presigned_url: Optional[str] = None
 
 class UploadError(Schema):
@@ -24,7 +24,7 @@ class DownloadSchemaInput(Schema):
 
 class DownloadSchemaOutput(Schema):
     mediadata: MediaSchema
-    file: Optional[bytes]
+    base64: Optional[str]
     object_url: Optional[str]
     # TODO verify that at-least/only file or link is not None
 

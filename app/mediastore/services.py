@@ -1,3 +1,5 @@
+import uuid
+
 from django.core.exceptions import ObjectDoesNotExist
 from ninja.errors import ValidationError, HttpError
 
@@ -62,7 +64,8 @@ class MediaService:
     @staticmethod
     def create(payload: MediaSchemaCreate) -> MediaSchema:
         MediaService.clean_identifiers(payload)
-
+        if not payload.store_key:
+            payload.store_key = str(uuid.uuid4())
         store_config,storeconfig_created,s3config_created = StoreService.get_or_create(payload.store_config)
         media = Media.objects.create(
             pid = payload.pid,
@@ -124,7 +127,13 @@ class MediaService:
             media.tags.add(*payload.tags)
         return media
 
-    #TODO CRUD for metadata,identifiers,tags,store_status SPECIFICALLY
+    #TODO CRUD for metadata,identifiers,tags SPECIFICALLY
+    @staticmethod
+    def update_status(pid:str, status:str):
+        media = Media.objects.get(pid=pid)
+        media.store_status = status
+        media.save()
+        return status
 
     @staticmethod
     def delete(pid: str) -> None:
