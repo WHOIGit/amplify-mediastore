@@ -24,8 +24,8 @@ class DownloadSchemaInput(Schema):
 
 class DownloadSchemaOutput(Schema):
     mediadata: MediaSchema
-    base64: Optional[str]
-    object_url: Optional[str]
+    base64: Optional[str] = ''
+    object_url: Optional[str] = ''
     # TODO verify that at-least/only file or link is not None
 
 class DownloadError(Schema):

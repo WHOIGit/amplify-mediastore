@@ -17,8 +17,13 @@ from mediastore.services import MediaService
 from mediastore.models import StoreConfig, S3Config
 
 
-def b64_to_bytearray(b64_content:str):
-    return bytearray(base64.b64decode(b64_content))
+def encode64(content:bytes) -> str:
+    encoded = base64.b64encode(content)
+    return encoded.decode('ascii')
+
+def decode64(content:str) -> bytes:
+    content = content.encode("ascii")
+    return base64.b64decode(content)
 
 
 class UploadService:
@@ -41,7 +46,7 @@ class UploadService:
         match store_config.type:
             case StoreConfig.FILESYSTEMSTORE:
                 store = storage.fs.FilesystemStore(store_config.bucket)
-                store.put(mediadata.store_key, b64_to_bytearray(payload.base64))
+                store.put(mediadata.store_key, bytearray(decode64(payload.base64)))
             case StoreConfig.BUCKETSTORE:
                 s3_params = S3Config.objects.get(url=store_config.s3_params.url, access_key=store_config.s3_params.access_key)
                 S3_CLIENT_ARGS = dict(
@@ -51,10 +56,10 @@ class UploadService:
                     bucket_name = store_config.bucket,
                 )
                 with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
-                    store.put(mediadata.store_key, b64_to_bytearray(payload.base64))
+                    store.put(mediadata.store_key, bytearray(decode64(payload.base64)))
             case StoreConfig.SQLITESTORE:
                 with storage.db.SqliteStore(store_config.bucket) as store:
-                    store.put(mediadata.store_key, b64_to_bytearray(payload.base64))
+                    store.put(mediadata.store_key, bytearray(decode64(payload.base64)))
 
         # set media object successful storage
         MediaService.update_status(mediadata.pid, status=StoreConfig.READY)
@@ -71,15 +76,12 @@ class UploadService:
 class DownloadService:
 
     @staticmethod
-    def download(payload: DownloadSchemaInput) -> DownloadSchemaOutput|DownloadError:
+    def download(payload: DownloadSchemaInput) -> DownloadSchemaOutput:
         # TODO provenance log file download attempt with amqp_util
-        try:
-            if payload.direct:
-                return DownloadService.download_direct(payload)
-            else:
-                return DownloadService.download_link(payload)
-        except Exception as e:
-            return DownloadError(error=str(e))
+        if payload.direct:
+            return DownloadService.download_direct(payload)
+        else:
+            return DownloadService.download_link(payload)
 
 
     @staticmethod
@@ -88,28 +90,30 @@ class DownloadService:
         store_config = mediadata.store_config
         match mediadata.store_config.type:
             case StoreConfig.FILESYSTEMSTORE:
-                with storage.fs.FilesystemStore(store_config.bucket) as store:
-                    file = store.get(mediadata.store_key)
+                store = storage.fs.FilesystemStore(store_config.bucket)
+                obj_content = store.get(mediadata.store_key)
             case StoreConfig.BUCKETSTORE:
-                s3_params = store_config.s3_params
-                s3_session = storage.s3.aiobotocore.session.get_session()
+                s3_params = S3Config.objects.get(url=store_config.s3_params.url, access_key=store_config.s3_params.access_key)
                 S3_CLIENT_ARGS = dict(
-                    endpoint_url=s3_params.url,
-                    aws_access_key_id=s3_params.access_key,
-                    aws_secret_access_key=s3_params.secret_key,  # todo, is this always available?
+                    s3_url = s3_params.url,
+                    s3_access_key = s3_params.access_key,
+                    s3_secret_key = s3_params.secret_key,
+                    bucket_name = store_config.bucket,
                 )
-                with s3_session.create_client('s3', **S3_CLIENT_ARGS) as s3client:
-                    with storage.s3.BucketStore(s3client, store_config.bucket) as store:
-                        file = store.get(mediadata.store_key)
+                with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
+                    obj_content = store.get(mediadata.store_key)
             case StoreConfig.SQLITESTORE:
                 with storage.db.SqliteStore(store_config.bucket) as store:
-                    file = store.put(mediadata.store_key)
-        # TODO serialise mediadata, filecontent -> file
-        return DownloadSchemaOutput(metadata=mediadata, file=file)
+                    obj_content = store.put(mediadata.store_key)
+
+        # converting obj_content bytes to base64
+        b64_content = encode64(obj_content)
+
+        return DownloadSchemaOutput(mediadata=mediadata, base64=b64_content)
 
     @staticmethod
     def download_link(payload: DownloadSchemaInput) -> DownloadSchemaOutput:
-        metadata = MediaService.read(payload.pid)
+        mediadata = MediaService.read(payload.pid)
         # TODO generate presigned url with storage_util
         object_url = 'link_to_file'
-        return DownloadSchemaOutput(metadata=metadata, object_url=object_url)
+        return DownloadSchemaOutput(mediadata=mediadata, object_url=object_url)
