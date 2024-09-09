@@ -7,7 +7,7 @@ from pydantic import BaseModel, ValidationError, model_validator, field_validato
 class S3ConfigSchema(Schema):
     url: str
     access_key: str
-    secret_key: Optional[str] = None
+    secret_key: Optional[str] = ''
 
 class StoreConfigSchema(Schema):
     type: str

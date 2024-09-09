@@ -19,19 +19,19 @@ class StoreService:
         return StoreConfigSchema(type=store_config.type, bucket=store_config.bucket, s3_params=s3config)
 
     @staticmethod
-    def get_or_create(store_config: StoreConfigSchema):
-        StoreService.clean(store_config)
-        store_config, storeconfig_created = StoreConfig.objects.get_or_create(type=store_config.type, bucket=store_config.bucket)
+    def get_or_create(storeconfig_schema: StoreConfigSchema):
+        StoreService.clean(storeconfig_schema)
+        store_config, storeconfig_created = StoreConfig.objects.get_or_create(type=storeconfig_schema.type, bucket=storeconfig_schema.bucket)
         s3config_created = None
         if store_config.type == StoreConfig.BUCKETSTORE:
             try:
-                s3config = S3Config.objects.get(url=store_config.s3_params.url, access_key=store_config.s3_params.access_key)
+                s3config = S3Config.objects.get(url=storeconfig_schema.s3_params.url, access_key=storeconfig_schema.s3_params.access_key)
                 s3config_created = False
             except ObjectDoesNotExist:
-                assert store_config.s3_params.secret_key, 'S3Config when created must include secret_key'
-                s3config = S3Config.objects.create(url=store_config.s3_params.url,
-                                     access_key=store_config.s3_params.access_key,
-                                     secret_key=store_config.s3_params.secret_key)
+                assert storeconfig_schema.s3_params.secret_key, 'S3Config when created must include secret_key'
+                s3config = S3Config.objects.create(url=storeconfig_schema.s3_params.url,
+                                     access_key=storeconfig_schema.s3_params.access_key,
+                                     secret_key=storeconfig_schema.s3_params.secret_key)
                 s3config_created = True
             store_config.s3_params = s3config
             store_config.save()
