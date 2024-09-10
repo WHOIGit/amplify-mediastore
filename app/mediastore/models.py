@@ -22,11 +22,13 @@ class StoreConfig(models.Model):
     HASHDIRSTORE = 'HashdirStore'
     ZIPSTORE = 'ZipStore'
     SQLITESTORE = 'SqliteStore'
+    DICTSTORE = 'DictStore'
     TYPES = ((BUCKETSTORE, 'BucketStore'),
              (FILESYSTEMSTORE, 'FilesystemStore'),
              (HASHDIRSTORE, 'HashdirStore'),
              (ZIPSTORE, 'ZipStore'),
              (SQLITESTORE, 'SqliteStore'),
+             (DICTSTORE, 'DictStore'),
              )
 
     PENDING = 'PENDING'

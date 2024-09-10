@@ -5,7 +5,6 @@ os.environ["NINJA_SKIP_REGISTRY"] = "yes"
 from django.test import TestCase
 from ninja.testing import TestClient
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.utils import IntegrityError
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 
@@ -179,7 +178,7 @@ class MediaApiTest(TestCase):
             store_config = self.demostore_dict,
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
-        content = resp.json()  # json.loads(resp.content.decode())
+        content = resp.json()
         self.assertEqual(resp.status_code, 422, msg=content)
         self.assertEqual(content["detail"][0]["error"], "bad identifier_type: BINxxx", content["detail"])
 
@@ -189,7 +188,6 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             store_config = self.demostore_dict,
-            store_key = 'bucketA:xyz',
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
@@ -197,10 +195,11 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             store_config = self.demostore_dict,
-            store_key = 'bucketA:xyz',
         )
-        with self.assertRaises(IntegrityError):
-            resp2 = self.client.post("/media", json=demo2, headers=self.auth_headers)
+        resp2 = self.client.post("/media", json=demo2, headers=self.auth_headers)
+        content = resp2.json()
+        expected_error = "<class 'django.db.utils.IntegrityError'>:UNIQUE constraint failed: mediastore_media.pid"
+        self.assertEqual(content["detail"][0]["error"], expected_error, content["detail"])
 
     def test_MediaService_create_read_delete(self):
         PID = 'm5'
@@ -366,8 +365,7 @@ class MediaApiTest(TestCase):
         received1 =  resp.json()
         PK = received1['pk']
         payload2 = dict(identifiers={'DEMO2':'newvalue',
-                                     'DEMO':PID}, # difference vs. test_create_patch
-                        )
+                                     'DEMO':PID}) # difference vs. test_create_patch
 
         resp2 = self.client.patch(f'/media/{PID}', json=payload2, headers=self.auth_headers)
         self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())

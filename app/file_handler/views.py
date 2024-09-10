@@ -18,10 +18,18 @@ def upload_media(request, payload:UploadSchemaInput):
     except Exception as e:
         return 401, UploadError(error=f'{type(e)}: {e}')
 
-@download_router.post('', response={200:DownloadSchemaOutput, 401:DownloadError})
-def download_media(request, payload: DownloadSchemaInput):
+@download_router.get('/{pid}', response={200:DownloadSchemaOutput, 401:DownloadError})
+def download_media(request, pid):
     try:
+        payload = DownloadSchemaInput(pid=pid, direct=True)
         return 200, DownloadService.download(payload)
     except Exception as e:
         return 401, DownloadError(error=f'{type(e)}: {e}')
 
+@download_router.get('/url/{pid}', response={200:DownloadSchemaOutput, 401:DownloadError})
+def download_media_url(request, pid):
+    try:
+        payload = DownloadSchemaInput(pid=pid, direct=False)
+        return 200, DownloadService.download(payload)
+    except Exception as e:
+        return 401, DownloadError(error=f'{type(e)}: {e}')

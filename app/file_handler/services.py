@@ -1,15 +1,9 @@
 import base64
 from typing import Optional
 
-from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
-from django.core.exceptions import ObjectDoesNotExist
-from rest_framework.authtoken.models import Token
-from ninja.errors import ValidationError, HttpError
-
 import amqp  # amplify_amqp_utils
 import storage  # amplify_storage_utils
-import storage.fs, storage.s3, storage.db
+import storage.fs, storage.s3, storage.db, storage.object
 
 from file_handler.schemas import UploadSchemaInput, UploadSchemaOutput, UploadError, \
                                  DownloadSchemaInput, DownloadSchemaOutput, DownloadError
@@ -24,6 +18,21 @@ def encode64(content:bytes) -> str:
 def decode64(content:str) -> bytes:
     content = content.encode("ascii")
     return base64.b64decode(content)
+
+class DictStoreSingleton(storage.object.DictStore):
+    """
+    Singleton version of storage.object.DictStore
+    for use in repeat queries to RAMSTORE
+    """
+    _instance = None
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(cls, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+    def __init__(self):
+        # Initialize objects only if not already initialized
+        if not hasattr(self, 'objects'):
+            self.objects = {}
 
 
 class UploadService:
@@ -47,6 +56,7 @@ class UploadService:
             case StoreConfig.FILESYSTEMSTORE:
                 store = storage.fs.FilesystemStore(store_config.bucket)
                 store.put(mediadata.store_key, bytearray(decode64(payload.base64)))
+
             case StoreConfig.BUCKETSTORE:
                 s3_params = S3Config.objects.get(url=store_config.s3_params.url, access_key=store_config.s3_params.access_key)
                 S3_CLIENT_ARGS = dict(
@@ -57,9 +67,14 @@ class UploadService:
                 )
                 with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
                     store.put(mediadata.store_key, bytearray(decode64(payload.base64)))
+
             case StoreConfig.SQLITESTORE:
                 with storage.db.SqliteStore(store_config.bucket) as store:
                     store.put(mediadata.store_key, bytearray(decode64(payload.base64)))
+
+            case StoreConfig.DICTSTORE:
+                store = DictStoreSingleton()
+                store.put(mediadata.store_key, bytearray(decode64(payload.base64)))
 
         # set media object successful storage
         MediaService.update_status(mediadata.pid, status=StoreConfig.READY)
@@ -79,9 +94,7 @@ class UploadService:
             bucket_name=media.store_config.bucket,
         )
         with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
-            #TODO obj_url = store.presigned_put(media.store_key)
-            put_url = store.s3_client.generate_presigned_url('put_object',
-                Params={'Key':media.store_key, 'Bucket':store.bucket_name}, ExpiresIn=3600)
+            put_url = store.presigned_put(media.store_key)
         return UploadSchemaOutput(status=StoreConfig.PENDING, presigned_put=put_url)
 
 
@@ -104,6 +117,7 @@ class DownloadService:
             case StoreConfig.FILESYSTEMSTORE:
                 store = storage.fs.FilesystemStore(store_config.bucket)
                 obj_content = store.get(mediadata.store_key)
+
             case StoreConfig.BUCKETSTORE:
                 s3_params = S3Config.objects.get(url=store_config.s3_params.url, access_key=store_config.s3_params.access_key)
                 S3_CLIENT_ARGS = dict(
@@ -114,9 +128,14 @@ class DownloadService:
                 )
                 with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
                     obj_content = store.get(mediadata.store_key)
+
             case StoreConfig.SQLITESTORE:
                 with storage.db.SqliteStore(store_config.bucket) as store:
-                    obj_content = store.put(mediadata.store_key)
+                    obj_content = store.get(mediadata.store_key)
+
+            case StoreConfig.DICTSTORE:
+                store = DictStoreSingleton()
+                obj_content = store.get(mediadata.store_key)
 
         # converting obj_content bytes to base64
         b64_content = encode64(obj_content)
@@ -135,8 +154,6 @@ class DownloadService:
             bucket_name=media.store_config.bucket,
         )
         with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
-            #TODO obj_url = store.presigned_get(media.store_key)
-            get_url = store.s3_client.generate_presigned_url('get_object',
-                Params={'Key':media.store_key, 'Bucket':store.bucket_name}, ExpiresIn=3600)
+            get_url = store.presigned_get(media.store_key)
         mediadata = MediaService.read(payload.pid)
         return DownloadSchemaOutput(mediadata=mediadata, presigned_get=get_url)

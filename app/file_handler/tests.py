@@ -29,28 +29,25 @@ def decode64(content:str) -> bytes:
 class FileHandlerFilestoreTests(TestCase):
     def setUp(self):
         IdentityType.objects.create(name='DEMO')
-        self.filestore_dict = dict(StoreConfigSchema(type=StoreConfig.FILESYSTEMSTORE, bucket='/demobucket', s3_params=None))
+        self.storeconfig_dict = dict(StoreConfigSchema(type=StoreConfig.FILESYSTEMSTORE, bucket='/demobucket', s3_params=None))
         self.user, created_user = User.objects.get_or_create(username='testuser')
         self.token, created_token = Token.objects.get_or_create(user=self.user)
         self.auth_headers = {'Authorization':f'Bearer {self.token}'}
         self.client = TestClient(api, headers=self.auth_headers)
 
-    def test_upload_fs(self):
-        PID = 'FSuploadPID'
+    def test_updown_ram(self):
+        PID = 'RAMuploadPID'
         mediadata = dict(
             pid = PID, pid_type = 'DEMO',
-            store_config = self.filestore_dict,
+            store_config = self.storeconfig_dict,
             store_key = 'TESTS/test.txt')
         upload_content = b'egg salad sand witch'
         payload = dict(UploadSchemaInput(mediadata=mediadata, base64=encode64(upload_content)))
         resp = self.client.post("/upload", json=payload)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
-        return PID
 
-    def test_download_fs_direct(self):
-        PID = self.test_upload_fs()
-        payload = dict(DownloadSchemaInput(pid=PID, direct=True))
-        resp = self.client.post("/download", json=payload)
+        # DOWNLOAD
+        resp = self.client.get(f"/download/{PID}")
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
         data = json.loads( resp.content.decode() )
 
@@ -60,9 +57,8 @@ class FileHandlerFilestoreTests(TestCase):
         store_status = data['mediadata']['store_status']
         self.assertEqual(store_status, StoreConfig.READY)
 
-        uploaded_content = b'egg salad sand witch'
         downloaded_content = decode64( data['base64'] )
-        self.assertEqual(downloaded_content, uploaded_content)
+        self.assertEqual(downloaded_content, upload_content)
 
 
 class FileHandlerS3storeTests(TestCase):
@@ -80,7 +76,7 @@ class FileHandlerS3storeTests(TestCase):
         self.s3store_dict = dict(StoreConfigSchema(type=StoreConfig.BUCKETSTORE, bucket=os.environ['TESTS_S3_BUCKET']))
         self.s3store_dict['s3_params'] = dict(url=self.s3_params.url, access_key=self.s3_params.access_key)
 
-    def test_upldown_s3_direct(self):
+    def test_updown_s3_direct(self):
         PID = 'S3uploadPID'
         mediadata = dict(MediaSchemaCreate(
             pid = PID, pid_type = 'DEMO',
@@ -93,8 +89,7 @@ class FileHandlerS3storeTests(TestCase):
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
 
         # DOWNLOAD DIRECT
-        payload = dict(DownloadSchemaInput(pid=PID, direct=True))
-        resp = self.client.post("/download", json=payload)
+        resp = self.client.get(f"/download/{PID}")
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
         data = json.loads( resp.content.decode() )
 
@@ -117,7 +112,7 @@ class FileHandlerS3storeTests(TestCase):
         payload = dict(UploadSchemaInput(mediadata=mediadata))  # sans base64 data
         resp = self.client.post("/upload", json=payload)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
-        presigned_put = json.loads(resp.content.decode())['presigned_put']
+        presigned_put = resp.json()['presigned_put']
 
         # Uploading file using presigned url for put.
         # Filename of uploaded file totally ignored, store_key from mediadata gets used.
@@ -126,8 +121,7 @@ class FileHandlerS3storeTests(TestCase):
         self.assertEqual(download_response.status_code, 200)
 
         # Fetching presigned S3 GET url
-        payload = dict(DownloadSchemaInput(pid=PID, direct=False))
-        resp = self.client.post('/download', json=payload)
+        resp = self.client.get(f"/download/url/{PID}")
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
         presigned_get = json.loads(resp.content.decode())['presigned_get']
 
@@ -139,11 +133,62 @@ class FileHandlerS3storeTests(TestCase):
         self.assertEqual(upload_content,downloaded_content)
 
 
+class FileHandlerDictstoreTests(TestCase):
+    def setUp(self):
+        FileHandlerFilestoreTests.setUp(self)
+        self.storeconfig_dict = dict(StoreConfigSchema(type=StoreConfig.DICTSTORE, bucket='/demobucket'))
+
+    def test_updown_RAM(self):
+        PID = 'RAMuploadPID'
+        mediadata = dict(
+            pid = PID, pid_type = 'DEMO',
+            store_config = self.storeconfig_dict,
+            store_key = 'TESTS/test.txt')
+        upload_content = b'egg salad sand witch'
+        payload = dict(UploadSchemaInput(mediadata=mediadata, base64=encode64(upload_content)))
+        resp = self.client.post("/upload", json=payload)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+
+        # DOWNLOAD
+        resp = self.client.get(f"/download/{PID}")
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        data = json.loads( resp.content.decode() )
+
+        self.assertIn('mediadata', data)
+        self.assertIn('store_status', data['mediadata'])
+        store_status = data['mediadata']['store_status']
+        self.assertEqual(store_status, StoreConfig.READY)
+
+        downloaded_content = decode64( data['base64'] )
+        self.assertEqual(downloaded_content, upload_content)
 
 
+class FileHandlerSqlitestoreTests(TestCase):
+    def setUp(self):
+        FileHandlerFilestoreTests.setUp(self)
+        self.storeconfig_dict = dict(StoreConfigSchema(
+            type=StoreConfig.SQLITESTORE, bucket='/demobucket/demodb.sqlite3'))
 
+    def test_updown_Sqlite(self):
+        PID = 'SqlitePID'
+        mediadata = dict(
+            pid = PID, pid_type = 'DEMO',
+            store_config = self.storeconfig_dict,
+            store_key = 'TESTS/test.txt')
+        upload_content = b'egg salad sand witch'
+        payload = dict(UploadSchemaInput(mediadata=mediadata, base64=encode64(upload_content)))
+        resp = self.client.post("/upload", json=payload)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
 
-class FileHandlerMemstoreTests(TestCase):
-    def setUp(self) -> None:
-        ...
-        #TODO in-memory storage
+        # DOWNLOAD
+        resp = self.client.get(f"/download/{PID}")
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        data = json.loads( resp.content.decode() )
+
+        self.assertIn('mediadata', data)
+        self.assertIn('store_status', data['mediadata'])
+        store_status = data['mediadata']['store_status']
+        self.assertEqual(store_status, StoreConfig.READY)
+
+        downloaded_content = decode64( data['base64'] )
+        self.assertEqual(downloaded_content, upload_content)
