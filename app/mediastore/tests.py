@@ -1,19 +1,18 @@
 import os
+import uuid
 os.environ["NINJA_SKIP_REGISTRY"] = "yes"
 
-import json
-
-from django.test import TestCase, Client
-from django.core.exceptions import ValidationError, ObjectDoesNotExist
+from django.test import TestCase
+from ninja.testing import TestClient
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.utils import IntegrityError
 from django.contrib.auth.models import User
-from ninja.testing import TestClient
 from rest_framework.authtoken.models import Token
 
 from .models import Media, IdentityType, StoreConfig
 from .schemas import StoreConfigSchema
 
-from config import api
+from config.api import api
 
 def ordered(obj):
     if isinstance(obj, dict):
@@ -65,7 +64,7 @@ class MediaApiTest(TestCase):
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
 
-    def test_UploadService_create_minimal(self):
+    def test_MediaService_create_minimal(self):
         # minimal create
         PID = 'm2'
         payload = dict(
@@ -75,6 +74,13 @@ class MediaApiTest(TestCase):
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        return resp
+
+    def test_storekey_autoset(self):
+        resp = self.test_MediaService_create_minimal()
+        generated_store_key = resp.json().pop('store_key')
+        self.assertNotEqual('',generated_store_key)  # if store_key is blank upon upload, a uuid4 gets generated.
+        self.assertEqual(uuid.UUID(generated_store_key).version, 4)
 
     def test_MediaService_create_dupeIDs(self):
         PID = 'm3'
@@ -83,13 +89,14 @@ class MediaApiTest(TestCase):
             pid_type = 'DEMO',
             identifiers = {'DEMO':PID, 'BIN':'bin_xyz'},
             store_config = self.demostore_dict,
+            store_key = 'eggplant',
         )
         expected = dict(
             pid = PID,
             pid_type = 'DEMO',
             identifiers = {'BIN':'bin_xyz'},
             store_config=self.demostore_dict,
-            store_key = '',
+            store_key = 'eggplant',
             store_status = StoreConfig.PENDING,
             metadata = {},
             tags = [],
@@ -328,6 +335,7 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             store_config = self.demostore_dict,
+            store_key = 'mystorekey',
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
@@ -349,12 +357,11 @@ class MediaApiTest(TestCase):
             pid_type = 'DEMO',
             identifiers = {'DEMO2':'newvalue'},
             store_config = self.demostore_dict,
-            store_key = '',
+            store_key = 'mystorekey',
             store_status = StoreConfig.PENDING,
             metadata = {},
             tags = [],
         )
-
         expected = ordered(expected)
         self.assertEqual(received3, expected, msg=f'{received3} != {expected}')
         return PK

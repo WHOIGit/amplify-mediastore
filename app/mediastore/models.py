@@ -47,7 +47,7 @@ class Media(models.Model):
     pid = models.CharField(max_length=255, unique=True)
     pid_type = models.CharField(max_length=255)
     store_config = models.ForeignKey(StoreConfig, on_delete=models.RESTRICT)
-    store_key = models.CharField(max_length=255, null=True, blank=True)
+    store_key = models.CharField(max_length=255, blank=True, null=False)
     store_status = models.CharField(max_length=12, choices=StoreConfig.STATUSES, default=StoreConfig.PENDING)
     identifiers = models.JSONField(default=dict)
     metadata = models.JSONField(default=dict)
@@ -57,3 +57,11 @@ class Media(models.Model):
 
     def __str__(self):
         return f'{self.pid_type}:{self.pid}'
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["store_key", "store_config"],
+                name="unique_storeKey_per_storeConfig",
+            ),
+        ]
