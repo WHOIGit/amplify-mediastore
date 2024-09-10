@@ -122,6 +122,30 @@ class MediaApiTest(TestCase):
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertNotEqual(resp.status_code, 200, msg=resp.content.decode())
 
+    def test_MediaService_create_dupeStoreKeys(self):
+        PID1 = 'storekey_dupe1'
+        storekey_dupe = 'eggplant'
+        payload1 = dict(
+            pid = PID1,
+            pid_type = 'DEMO',
+            store_config = self.demostore_dict,
+            store_key = storekey_dupe,
+        )
+        PID2 = 'storekey_dupe2'
+        payload2 = dict(
+            pid = PID2,
+            pid_type = 'DEMO',
+            store_config = self.demostore_dict,
+            store_key = storekey_dupe,
+        )
+        resp1 = self.client.post("/media", json=payload1, headers=self.auth_headers)
+        self.assertEqual(resp1.status_code, 200, msg=resp1.content.decode())
+        resp2 = self.client.post("/media", json=payload2, headers=self.auth_headers)
+        self.assertEqual(resp2.status_code, 422, msg=resp2.content.decode())
+        content = resp2.json()
+        expected_error = f'store_key "{storekey_dupe}" is not unique with this store_config'
+        self.assertEqual(content["detail"][0]["error"], expected_error)
+
     def test_MediaService_create_bad_identifiers(self):
         PID = 'm333'
         payload = dict(

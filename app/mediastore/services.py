@@ -1,6 +1,7 @@
 import uuid
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.utils import IntegrityError
 from ninja.errors import ValidationError, HttpError
 
 from mediastore.models import Media, IdentityType, StoreConfig, S3Config
@@ -67,15 +68,21 @@ class MediaService:
         if not payload.store_key:
             payload.store_key = str(uuid.uuid4())
         store_config,storeconfig_created,s3config_created = StoreService.get_or_create(payload.store_config)
-        media = Media.objects.create(
-            pid = payload.pid,
-            pid_type = payload.pid_type,
-            store_config = store_config,
-            store_key = payload.store_key,
-            store_status = StoreConfig.PENDING,
-            identifiers = payload.identifiers, # already cleaned
-            metadata = payload.metadata,
-        )
+        try:
+            media = Media.objects.create(
+                pid = payload.pid,
+                pid_type = payload.pid_type,
+                store_config = store_config,
+                store_key = payload.store_key,
+                store_status = StoreConfig.PENDING,
+                identifiers = payload.identifiers, # already cleaned
+                metadata = payload.metadata,
+            )
+        except IntegrityError as e:
+            if str(e) == 'UNIQUE constraint failed: mediastore_media.store_key, mediastore_media.store_config_id':
+                raise ValidationError([dict(error=f'store_key "{payload.store_key}" is not unique with this store_config')])
+            else:
+                raise ValidationError([dict(error=f'{type(e)}:{e}')])
         media.tags.set(payload.tags)
         return MediaService.serialize(media)
 
