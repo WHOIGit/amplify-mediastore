@@ -12,7 +12,7 @@ class UploadSchemaInput(Schema):
 
 class UploadSchemaOutput(Schema):
     status: str
-    presigned_url: Optional[str] = None
+    presigned_put: Optional[str] = None
 
 class UploadError(Schema):
     error: str
@@ -25,7 +25,7 @@ class DownloadSchemaInput(Schema):
 class DownloadSchemaOutput(Schema):
     mediadata: MediaSchema
     base64: Optional[str] = ''
-    object_url: Optional[str] = ''
+    presigned_get: Optional[str] = ''
     # TODO verify that at-least/only file or link is not None
 
 class DownloadError(Schema):

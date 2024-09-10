@@ -14,7 +14,7 @@ import storage.fs, storage.s3, storage.db
 from file_handler.schemas import UploadSchemaInput, UploadSchemaOutput, UploadError, \
                                  DownloadSchemaInput, DownloadSchemaOutput, DownloadError
 from mediastore.services import MediaService
-from mediastore.models import StoreConfig, S3Config
+from mediastore.models import StoreConfig, S3Config, Media
 
 
 def encode64(content:bytes) -> str:
@@ -69,8 +69,20 @@ class UploadService:
     @staticmethod
     def upload_sans_file(payload: UploadSchemaInput) -> UploadSchemaOutput:
         assert payload.mediadata.store_config.type == StoreConfig.BUCKETSTORE
-        # TODO generate presigned url with storage_util
-        return UploadSchemaOutput(status=StoreConfig.PENDING, presigned_url='my_presigned_url')
+        mediadata = MediaService.create(payload.mediadata)  # returns MediaSchema after creating database entry
+        media = Media.objects.get(pid=mediadata.pid)
+        s3_params = media.store_config.s3_params
+        S3_CLIENT_ARGS = dict(
+            s3_url=s3_params.url,
+            s3_access_key=s3_params.access_key,
+            s3_secret_key=s3_params.secret_key,
+            bucket_name=media.store_config.bucket,
+        )
+        with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
+            #TODO obj_url = store.presigned_put(media.store_key)
+            put_url = store.s3_client.generate_presigned_url('put_object',
+                Params={'Key':media.store_key, 'Bucket':store.bucket_name}, ExpiresIn=3600)
+        return UploadSchemaOutput(status=StoreConfig.PENDING, presigned_put=put_url)
 
 
 class DownloadService:
@@ -113,7 +125,18 @@ class DownloadService:
 
     @staticmethod
     def download_link(payload: DownloadSchemaInput) -> DownloadSchemaOutput:
+        media = Media.objects.get(pid=payload.pid)
+        assert media.store_config.type == StoreConfig.BUCKETSTORE
+        s3_params = media.store_config.s3_params
+        S3_CLIENT_ARGS = dict(
+            s3_url=s3_params.url,
+            s3_access_key=s3_params.access_key,
+            s3_secret_key=s3_params.secret_key,
+            bucket_name=media.store_config.bucket,
+        )
+        with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
+            #TODO obj_url = store.presigned_get(media.store_key)
+            get_url = store.s3_client.generate_presigned_url('get_object',
+                Params={'Key':media.store_key, 'Bucket':store.bucket_name}, ExpiresIn=3600)
         mediadata = MediaService.read(payload.pid)
-        # TODO generate presigned url with storage_util
-        object_url = 'link_to_file'
-        return DownloadSchemaOutput(mediadata=mediadata, object_url=object_url)
+        return DownloadSchemaOutput(mediadata=mediadata, presigned_get=get_url)
