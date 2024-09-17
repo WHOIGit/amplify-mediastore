@@ -12,6 +12,9 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.authtoken.models import Token
 
+try: import requests  # only used for one test in whole project
+except ImportError: requests=None
+
 from config.api import api
 
 from mediastore.models import Media, IdentityType, StoreConfig, S3Config
@@ -115,8 +118,8 @@ class FileHandlerS3storeTests(TestCase):
         downloaded_content = decode64( data['base64'] )
         self.assertEqual(downloaded_content, upload_content)
 
+    @skipIf(requests is None, 'requests module unavailable')
     def test_updown_s3_presigned(self):
-        import requests
         PID = 'S3updownPresigned'
         mediadata = dict(MediaSchemaCreate(
             pid=PID, pid_type='DEMO',
