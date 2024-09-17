@@ -36,7 +36,7 @@ class StoreConfig(models.Model):
                 (READY,  'READY'))
 
     type = models.CharField(max_length=255, choices=TYPES)
-    s3cfg = models.ForeignKey(S3Config, on_delete=models.SET_NULL, null=True, default=None)
+    s3cfg = models.ForeignKey(S3Config, on_delete=models.RESTRICT, null=True, default=None)
     bucket = models.CharField(max_length=255)
     # bucket used as local_root path if used for FilesystemStore HashdirStore ZipStore SqliteStore, ie if s3_params = null
 
