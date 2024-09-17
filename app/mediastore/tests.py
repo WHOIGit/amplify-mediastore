@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 
 from .models import Media, IdentityType, StoreConfig
-from .schemas import StoreConfigSchema, StoreConfigSchemaCreate
+from .schemas import StoreConfigSchema, StoreConfigSchemaCreate, S3ConfigSchemaCreate, S3ConfigSchemaSansKeys
 
 from config.api import api
 
@@ -420,3 +420,117 @@ class MediaVersioningTest(TestCase):
         #expected = {'EGG':'NOG','zip':'ZAP'}   # the PUT that was used
         #self.assertEqual(dict_diff, set(expected.items()))
         #self.assertEqual(metadata_changes.old, metadata_changes.new)
+
+
+class StoreCRUDTests(TestCase):
+
+    def setUp(self):
+        self.user, created_user = User.objects.get_or_create(username='testuser')
+        self.token, created_token = Token.objects.get_or_create(user=self.user)
+        self.auth_headers = {'Authorization':f'Bearer {self.token}'}
+        self.client = TestClient(api, headers=self.auth_headers)
+
+    def test_store_crud(self):
+        # CREATE
+        payload = dict(StoreConfigSchemaCreate(type='FilesystemStore', bucket='/demobucket', s3_url=''))
+        resp = self.client.post("/store", json=payload)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+
+        received = resp.json()
+        PK = received['pk']
+        expected = dict(pk=1, type='FilesystemStore', bucket='/demobucket', s3_url='')
+
+        received,expected = ordered(received),ordered(expected)
+        self.assertEqual(received, expected)
+
+        # GET
+        resp = self.client.get(f"/store/{PK}")
+        received = resp.json()
+        received = ordered(received)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        self.assertEqual(received, expected)
+
+        # GET LIST
+        resp = self.client.get(f"/stores")
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        self.assertEqual(ordered(resp.json()), [expected])
+
+        # DELETE
+        resp = self.client.delete(f"/store/{PK}")
+        self.assertEqual(resp.status_code, 204, msg=resp.content.decode())
+
+        # GET LIST empty
+        resp = self.client.get(f"/stores")
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        self.assertEqual(resp.json(), [])
+
+
+    def test_store_crud_s3(self):
+        # CREATE S3CFG
+        url1 = os.getenv('TESTS_S3_URL','https://my.endpoint.s3')
+        access_key = os.getenv('TESTS_S3_ACCESS','bingus')
+        secret_key = os.getenv('TESTS_S3_SECRET','secretbingus')
+        payload = dict(S3ConfigSchemaCreate(url=url1, access_key=access_key, secret_key=secret_key))
+
+        resp = self.client.post("/s3cfg", json=payload)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        received = resp.json()
+        expected = dict(S3ConfigSchemaSansKeys(pk=1, url=url1))
+        self.assertEqual(ordered(received),ordered(expected))
+        S3CFG_PK = received['pk']
+
+        # GET S3CFG
+        resp = self.client.get(f"/s3cfg/{S3CFG_PK}")
+        self.assertEqual(ordered(resp.json()),ordered(expected))
+
+        # PUT
+        url2 = url1.replace('http','https')
+        payload = dict(S3ConfigSchemaCreate(url=url2, access_key=access_key, secret_key=secret_key))
+        resp = self.client.put(f"/s3cfg/{S3CFG_PK}", json=payload)
+        self.assertEqual(resp.status_code, 204, msg=resp.content.decode())
+
+        # GET S3CFG list
+        resp = self.client.get(f"/s3cfgs")
+        expected = dict(S3ConfigSchemaSansKeys(pk=1, url=url2))
+        self.assertEqual(ordered(resp.json()), [ordered(expected)])
+
+
+        # CREATE Store
+        payload = dict(StoreConfigSchemaCreate(type='BucketStore', bucket='/demobucket', s3_url=url2))
+        resp = self.client.post("/store", json=payload)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+
+        received = resp.json()
+        STORE_PK = received['pk']
+        expected = dict(pk=1, type='BucketStore', bucket='/demobucket', s3_url=url2)
+
+        received,expected = ordered(received),ordered(expected)
+        self.assertEqual(received, expected)
+
+        # GET Store
+        resp = self.client.get(f"/store/{STORE_PK}")
+        received = resp.json()
+        received = ordered(received)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        self.assertEqual(received, expected)
+
+        # GET Store LIST
+        resp = self.client.get(f"/stores")
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        self.assertEqual(ordered(resp.json()), [expected])
+
+        # DELETE Store
+        resp = self.client.delete(f"/store/{STORE_PK}")
+        self.assertEqual(resp.status_code, 204, msg=resp.content.decode())
+        # GET Store LIST empty
+        resp = self.client.get(f"/stores")
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        self.assertEqual(resp.json(), [])
+
+        # DELETE S3CFG
+        resp = self.client.delete(f"/s3cfg/{S3CFG_PK}")
+        self.assertEqual(resp.status_code, 204, msg=resp.content.decode())
+        # GET S3CFG LIST empty
+        resp = self.client.get(f"/s3cfgs")
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        self.assertEqual(resp.json(), [])

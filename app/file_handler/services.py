@@ -46,12 +46,9 @@ class UploadService:
             resp = UploadService.upload_sans_file(payload)
         return resp
 
-
-
     @staticmethod
     def upload_with_file(payload: UploadSchemaInput) -> UploadSchemaOutput:
-        mediadata = MediaService.create(payload.mediadata)  # returns MediaSchema after creating database entry
-        media = Media.objects.get(pk=mediadata.pk)
+        media = MediaService.create(payload.mediadata, as_schema=False)
         match media.store_config.type:
             case StoreConfig.FILESYSTEMSTORE:
                 store = storage.fs.FilesystemStore(media.store_config.bucket)
@@ -76,15 +73,16 @@ class UploadService:
                 store.put(media.store_key, bytearray(decode64(payload.base64)))
 
         # set media object successful storage
-        MediaService.update_status(mediadata.pid, status=StoreConfig.READY)
+        #MediaService.update_status(media.pid, status=StoreConfig.READY)
+        media.status = StoreConfig.READY
+        media.save()
 
-        return UploadSchemaOutput(status=StoreConfig.READY)
+        return UploadSchemaOutput(status=media.status)
 
     @staticmethod
     def upload_sans_file(payload: UploadSchemaInput) -> UploadSchemaOutput:
         assert payload.mediadata.store_config.type == StoreConfig.BUCKETSTORE
-        mediadata = MediaService.create(payload.mediadata)  # returns MediaSchema after creating database entry
-        media = Media.objects.get(pk=mediadata.pk)
+        media = MediaService.create(payload.mediadata, as_schema=False)  # returns MediaSchema after creating database entry
         S3_CLIENT_ARGS = dict(
             s3_url = media.store_config.s3cfg.url,
             s3_access_key = media.store_config.s3cfg.access_key,
@@ -106,14 +104,12 @@ class DownloadService:
         else:
             return DownloadService.download_link(payload)
 
-
     @staticmethod
     def download_direct(payload: DownloadSchemaInput) -> DownloadSchemaOutput:
-        mediadata = MediaService.read(payload.pid)
-        media = Media.objects.get(pk=mediadata.pk)
-        match mediadata.store_config.type:
+        media = Media.objects.get(pk=payload.pk)
+        match media.store_config.type:
             case StoreConfig.FILESYSTEMSTORE:
-                store = storage.fs.FilesystemStore(mediadata.store_config.bucket)
+                store = storage.fs.FilesystemStore(media.store_config.bucket)
                 obj_content = store.get(media.store_key)
 
             case StoreConfig.BUCKETSTORE:
@@ -136,8 +132,7 @@ class DownloadService:
 
         # converting obj_content bytes to base64
         b64_content = encode64(obj_content)
-
-        return DownloadSchemaOutput(mediadata=mediadata, base64=b64_content)
+        return DownloadSchemaOutput(mediadata=MediaService.serialize(media), base64=b64_content)
 
     @staticmethod
     def download_link(payload: DownloadSchemaInput) -> DownloadSchemaOutput:
@@ -151,5 +146,4 @@ class DownloadService:
         )
         with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
             get_url = store.presigned_get(media.store_key)
-        mediadata = MediaService.read(payload.pid)
-        return DownloadSchemaOutput(mediadata=mediadata, presigned_get=get_url)
+        return DownloadSchemaOutput(mediadata=MediaService.serialize(media), presigned_get=get_url)

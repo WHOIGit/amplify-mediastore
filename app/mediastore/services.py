@@ -14,8 +14,9 @@ class S3ConfigService:
         return S3ConfigSchemaSansKeys(pk=s3cfg.pk, url=s3cfg.url)
 
     @staticmethod
-    def create(s3cfg_schema: S3ConfigSchemaCreate):
+    def create(s3cfg_schema: S3ConfigSchemaCreate, as_schema=True):
         s3cfg, s3cfg_created = S3Config.objects.get_or_create(**dict(s3cfg_schema))
+        if as_schema: return S3ConfigService.serialize(s3cfg)
         return s3cfg, s3cfg_created
 
     @staticmethod
@@ -51,6 +52,8 @@ class StoreService:
 
     @staticmethod
     def clean(payload: type[StoreConfigSchema|StoreConfigSchemaCreate]):
+        if payload.type not in list(zip(*StoreConfig.TYPES))[0]:
+            raise ValidationError([dict(error=f'type "{payload.type}" not supported.')])
         if payload.type == StoreConfig.BUCKETSTORE and not payload.s3_url:
             raise ValidationError([dict(error='type[BUCKETSTORE] must include s3_url')])
         if payload.type != StoreConfig.BUCKETSTORE and payload.s3_url:
@@ -58,7 +61,7 @@ class StoreService:
         return payload
 
     @staticmethod
-    def create(storeconfig_schema: StoreConfigSchemaCreate):
+    def create(storeconfig_schema: StoreConfigSchemaCreate, as_schema=True):
         StoreService.clean(storeconfig_schema)
         s3cfg = None
         if storeconfig_schema.type == StoreConfig.BUCKETSTORE:
@@ -67,6 +70,7 @@ class StoreService:
                 raise ValidationError([dict(error=f'No S3Config with url="{storeconfig_schema.s3_url}" found. Please create S3Config credentials for this url first')])
         store_config, storeconfig_created = StoreConfig.objects.get_or_create(
             type=storeconfig_schema.type, bucket=storeconfig_schema.bucket, s3cfg=s3cfg)
+        if as_schema: return StoreService.serialize(store_config)
         return store_config, storeconfig_created
 
     @staticmethod
@@ -116,10 +120,10 @@ class MediaService:
         )
 
     @staticmethod
-    def create(payload: MediaSchemaCreate) -> MediaSchema:
+    def create(payload: MediaSchemaCreate, as_schema=True) -> MediaSchema:
         MediaService.clean_identifiers(payload)
         store_key = str(uuid.uuid4())  # CREATE STORE KEY #
-        store_config,storeconfig_created = StoreService.create(payload.store_config)
+        store_config,storeconfig_created = StoreService.create(payload.store_config, as_schema=False)
         try:
             media = Media.objects.create(
                 pid = payload.pid,
@@ -136,7 +140,8 @@ class MediaService:
             else:
                 raise ValidationError([dict(error=f'{type(e)}:{e}')])
         media.tags.set(payload.tags)
-        return MediaService.serialize(media)
+        if as_schema: return MediaService.serialize(media)
+        return media
 
     @staticmethod
     def read(pid: str) -> MediaSchema:
@@ -152,7 +157,7 @@ class MediaService:
 
     @staticmethod
     def put(pid: str, payload: MediaSchemaUpdate) -> None:
-        store_config,storeconfig_created = StoreService.create(payload.store_config)
+        store_config,storeconfig_created = StoreService.create(payload.store_config, as_schema=False)
         media = Media.objects.get(pid=pid)
         media.pid = payload.pid
         media.pid_type = payload.pid_type
@@ -171,7 +176,7 @@ class MediaService:
         if payload.pid_type:
             media.pid_type = payload.pid_type
         if payload.store_config:
-            store_config, storeconfig_created = StoreService.create(payload.store_config)
+            store_config, storeconfig_created = StoreService.create(payload.store_config, as_schema=False)
             media.store_config = store_config
         if payload.identifiers:
             MediaService.clean_identifiers(payload, media_obj=media)  # because sometimes PID is not included

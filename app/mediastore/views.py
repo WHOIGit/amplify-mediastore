@@ -66,10 +66,10 @@ def create_store(request, store: StoreConfigSchemaCreate):
 def read_store(request, pk: int):
     return StoreService.read(pk)
 
-@router.put('/store/{pk}', response={204: int})
-def put_store(request, pk: int, store: StoreConfigSchemaCreate):
-    StoreService.update(pk, store)
-    return 204
+#@router.put('/store/{pk}', response={204: int})
+#def put_store(request, pk: int, store: StoreConfigSchemaCreate):
+#    StoreService.update(pk, store)
+#    return 204
 
 @router.delete('/store/{pk}', response={204: int})
 def delete_store(request, pk: int):
@@ -80,23 +80,23 @@ def delete_store(request, pk: int):
 ## S3 CONFIGS ##
 
 @router.get('/s3cfgs', response=list[S3ConfigSchemaSansKeys])
-def list_stores(request):
+def list_s3cfg(request):
     return S3ConfigService.list()
 
 @router.post('/s3cfg', response=S3ConfigSchemaSansKeys)
-def create_store(request, s3cfg: S3ConfigSchemaCreate):
+def create_s3cfg(request, s3cfg: S3ConfigSchemaCreate):
     return S3ConfigService.create(s3cfg)
 
 @router.get('/s3cfg/{pk}', response=S3ConfigSchemaSansKeys)
-def read_store(request, pk: int):
+def read_s3cfg(request, pk: int):
     return S3ConfigService.read(pk)
 
 @router.put('/s3cfg/{pk}', response={204: int})
-def put_store(request, pk: int, s3cfg: S3ConfigSchemaCreate):
+def put_s3cfg(request, pk: int, s3cfg: S3ConfigSchemaCreate):
     S3ConfigService.update(pk, s3cfg)
     return 204
 
 @router.delete('/s3cfg/{pk}', response={204: int})
-def delete_store(request, pk: int):
+def delete_s3cfg(request, pk: int):
     S3ConfigService.delete(pk)
     return 204
