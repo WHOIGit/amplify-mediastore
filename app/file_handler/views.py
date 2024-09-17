@@ -9,7 +9,6 @@ from file_handler.schemas import UploadSchemaInput, UploadSchemaOutput, UploadEr
                                  DownloadSchemaInput, DownloadSchemaOutput, DownloadError
 from file_handler.services import UploadService, DownloadService
 
-from mediastore.schemas import MediaSchemaCreate,StoreConfigSchema
 
 @upload_router.post('', response={200:UploadSchemaOutput, 401:UploadError})
 def upload_media(request, payload:UploadSchemaInput):

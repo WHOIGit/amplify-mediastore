@@ -4,7 +4,6 @@ from django.core.exceptions import ValidationError
 from taggit.managers import TaggableManager
 from simple_history.models import HistoricalRecords
 
-from .schemas import MediaSchema, StoreConfigSchema, S3ConfigSchema
 
 class IdentityType(models.Model):
     name = models.CharField(max_length=255, unique=True)
@@ -12,9 +11,9 @@ class IdentityType(models.Model):
     #regex = models.CharField(max_length=255)
 
 class S3Config(models.Model):
-    url = models.URLField(max_length=255)
+    url = models.URLField(max_length=255, unique=True)
     access_key = models.CharField(max_length=255)
-    secret_key = models.CharField(max_length=255)  #TODO make sure is hashed/secured
+    secret_key = models.CharField(max_length=255)
 
 class StoreConfig(models.Model):
     BUCKETSTORE = 'BucketStore'
@@ -37,7 +36,7 @@ class StoreConfig(models.Model):
                 (READY,  'READY'))
 
     type = models.CharField(max_length=255, choices=TYPES)
-    s3_params = models.ForeignKey(S3Config, on_delete=models.SET_NULL, null=True, default=None)
+    s3cfg = models.ForeignKey(S3Config, on_delete=models.SET_NULL, null=True, default=None)
     bucket = models.CharField(max_length=255)
     # bucket used as local_root path if used for FilesystemStore HashdirStore ZipStore SqliteStore, ie if s3_params = null
 

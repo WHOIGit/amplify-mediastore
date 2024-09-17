@@ -2,6 +2,7 @@ import os
 import base64
 import uuid
 import json
+from unittest import skipIf
 
 os.environ["NINJA_SKIP_REGISTRY"] = "yes"
 
@@ -14,7 +15,7 @@ from rest_framework.authtoken.models import Token
 from config.api import api
 
 from mediastore.models import Media, IdentityType, StoreConfig, S3Config
-from mediastore.schemas import MediaSchemaCreate, StoreConfigSchema, S3ConfigSchema
+from mediastore.schemas import MediaSchemaCreate, StoreConfigSchemaCreate, S3ConfigSchemaCreate
 from .schemas import UploadSchemaInput, DownloadSchemaInput
 
 def encode64(content:bytes) -> str:
@@ -29,7 +30,7 @@ def decode64(content:str) -> bytes:
 class FileHandlerFilestoreTests(TestCase):
     def setUp(self):
         IdentityType.objects.create(name='DEMO')
-        self.storeconfig_dict = dict(StoreConfigSchema(type=StoreConfig.FILESYSTEMSTORE, bucket='/demobucket', s3_params=None))
+        self.storeconfig_dict = dict(StoreConfigSchemaCreate(type=StoreConfig.FILESYSTEMSTORE, bucket='/demobucket', s3_url=''))
         self.user, created_user = User.objects.get_or_create(username='testuser')
         self.token, created_token = Token.objects.get_or_create(user=self.user)
         self.auth_headers = {'Authorization':f'Bearer {self.token}'}
@@ -37,10 +38,9 @@ class FileHandlerFilestoreTests(TestCase):
 
     def test_updown_ram(self):
         PID = 'RAMuploadPID'
-        mediadata = dict(
+        mediadata = dict(MediaSchemaCreate(
             pid = PID, pid_type = 'DEMO',
-            store_config = self.storeconfig_dict,
-            store_key = 'TESTS/test.txt')
+            store_config = self.storeconfig_dict))
         upload_content = b'egg salad sand witch'
         payload = dict(UploadSchemaInput(mediadata=mediadata, base64=encode64(upload_content)))
         resp = self.client.post("/upload", json=payload)
@@ -61,6 +61,7 @@ class FileHandlerFilestoreTests(TestCase):
         self.assertEqual(downloaded_content, upload_content)
 
 
+@skipIf('TESTS_S3_URL' not in os.environ or not os.environ['TESTS_S3_URL'], '"TESTS_S3_URL" env variable not set in')
 class FileHandlerS3storeTests(TestCase):
     def setUp(self):
         IdentityType.objects.create(name='DEMO')
@@ -69,19 +70,32 @@ class FileHandlerS3storeTests(TestCase):
         self.auth_headers = {'Authorization':f'Bearer {self.token}'}
         self.client = TestClient(api, headers=self.auth_headers)
 
-        self.s3_params,created_s3params = S3Config.objects.get_or_create(
+        self.s3cfg,created_s3cfg = S3Config.objects.get_or_create(
             url=os.environ['TESTS_S3_URL'],
             access_key=os.environ['TESTS_S3_ACCESS'],
             secret_key=os.environ['TESTS_S3_SECRET'])
-        self.s3store_dict = dict(StoreConfigSchema(type=StoreConfig.BUCKETSTORE, bucket=os.environ['TESTS_S3_BUCKET']))
-        self.s3store_dict['s3_params'] = dict(url=self.s3_params.url, access_key=self.s3_params.access_key)
+        self.s3store_dict = dict(StoreConfigSchemaCreate(type=StoreConfig.BUCKETSTORE,
+                bucket=os.environ['TESTS_S3_BUCKET'], s3_url=os.environ['TESTS_S3_URL']))
+
+    def tearDown(self) -> None:
+        # removes uploaded objects from test bucket
+        import storage.s3
+        medias = Media.objects.all()
+        for media in medias:
+            S3_CLIENT_ARGS = dict(
+                s3_url=media.store_config.s3cfg.url,
+                s3_access_key=media.store_config.s3cfg.access_key,
+                s3_secret_key=media.store_config.s3cfg.secret_key,
+                bucket_name=media.store_config.bucket,
+            )
+            with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
+                store.delete(media.store_key)
 
     def test_updown_s3_direct(self):
         PID = 'S3uploadPID'
         mediadata = dict(MediaSchemaCreate(
             pid = PID, pid_type = 'DEMO',
-            store_config = self.s3store_dict,
-            store_key='TESTS/test.txt'))
+            store_config = self.s3store_dict))
         upload_content = b'egg salad sand witch'
         encoded_content = encode64(upload_content)
         payload = dict(UploadSchemaInput(mediadata=mediadata, base64=encoded_content))
@@ -106,8 +120,7 @@ class FileHandlerS3storeTests(TestCase):
         PID = 'S3updownPresigned'
         mediadata = dict(MediaSchemaCreate(
             pid=PID, pid_type='DEMO',
-            store_config=self.s3store_dict,
-            store_key='TESTS/test2.txt'))
+            store_config=self.s3store_dict))
         upload_content = b'egg salad sand witch\n'+str(uuid.uuid1()).encode('ascii')
         payload = dict(UploadSchemaInput(mediadata=mediadata))  # sans base64 data
         resp = self.client.post("/upload", json=payload)
@@ -115,7 +128,7 @@ class FileHandlerS3storeTests(TestCase):
         presigned_put = resp.json()['presigned_put']
 
         # Uploading file using presigned url for put.
-        # Filename of uploaded file totally ignored, store_key from mediadata gets used.
+        # Filename of uploaded file totally ignored, store_key gets used instead.
         test_file = SimpleUploadedFile("TEST2.txt", upload_content)#, content_type="text/plain")
         download_response = requests.put(presigned_put, data=test_file)
         self.assertEqual(download_response.status_code, 200)
@@ -126,7 +139,7 @@ class FileHandlerS3storeTests(TestCase):
         presigned_get = json.loads(resp.content.decode())['presigned_get']
 
         # Downloading file using presigned GET url.
-        # Filename of uploaded file totally ignored, store_key from mediadata gets used.
+        # Filename of uploaded file totally ignored, store_key gets used instead.
         download_response = requests.get(presigned_get)
         self.assertEqual(download_response.status_code, 200, download_response.content.decode())
         downloaded_content = download_response.content
@@ -136,14 +149,13 @@ class FileHandlerS3storeTests(TestCase):
 class FileHandlerDictstoreTests(TestCase):
     def setUp(self):
         FileHandlerFilestoreTests.setUp(self)
-        self.storeconfig_dict = dict(StoreConfigSchema(type=StoreConfig.DICTSTORE, bucket='/demobucket'))
+        self.storeconfig_dict = dict(StoreConfigSchemaCreate(type=StoreConfig.DICTSTORE, bucket='/demobucket'))
 
     def test_updown_RAM(self):
         PID = 'RAMuploadPID'
-        mediadata = dict(
+        mediadata = dict(MediaSchemaCreate(
             pid = PID, pid_type = 'DEMO',
-            store_config = self.storeconfig_dict,
-            store_key = 'TESTS/test.txt')
+            store_config = self.storeconfig_dict))
         upload_content = b'egg salad sand witch'
         payload = dict(UploadSchemaInput(mediadata=mediadata, base64=encode64(upload_content)))
         resp = self.client.post("/upload", json=payload)
@@ -166,15 +178,14 @@ class FileHandlerDictstoreTests(TestCase):
 class FileHandlerSqlitestoreTests(TestCase):
     def setUp(self):
         FileHandlerFilestoreTests.setUp(self)
-        self.storeconfig_dict = dict(StoreConfigSchema(
+        self.storeconfig_dict = dict(StoreConfigSchemaCreate(
             type=StoreConfig.SQLITESTORE, bucket='/demobucket/demodb.sqlite3'))
 
     def test_updown_Sqlite(self):
         PID = 'SqlitePID'
         mediadata = dict(
             pid = PID, pid_type = 'DEMO',
-            store_config = self.storeconfig_dict,
-            store_key = 'TESTS/test.txt')
+            store_config = self.storeconfig_dict)
         upload_content = b'egg salad sand witch'
         payload = dict(UploadSchemaInput(mediadata=mediadata, base64=encode64(upload_content)))
         resp = self.client.post("/upload", json=payload)

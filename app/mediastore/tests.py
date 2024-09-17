@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 
 from .models import Media, IdentityType, StoreConfig
-from .schemas import StoreConfigSchema
+from .schemas import StoreConfigSchema, StoreConfigSchemaCreate
 
 from config.api import api
 
@@ -29,7 +29,7 @@ class MediaApiTest(TestCase):
         IdentityType.objects.create(name='DEMO')
         IdentityType.objects.create(name='BIN')
         IdentityType.objects.create(name='DEMO2')
-        self.demostore_dict = dict(StoreConfigSchema(type='FilesystemStore', bucket='/demobucket', s3_params=None))
+        self.demostore_dict = dict(StoreConfigSchemaCreate(type='FilesystemStore', bucket='/demobucket', s3_url=''))
         self.user, created_user = User.objects.get_or_create(username='testuser')
         self.token, created_token = Token.objects.get_or_create(user=self.user)
         self.auth_headers = {'Authorization':f'Bearer {self.token}'}
@@ -57,7 +57,6 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             store_config = self.demostore_dict,
-            store_key = 'bucketA:xyz',
             metadata = {'egg':'nog'},
             identifiers = {'BIN':'bin_xyz'} )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
@@ -75,12 +74,6 @@ class MediaApiTest(TestCase):
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
         return resp
 
-    def test_storekey_autoset(self):
-        resp = self.test_MediaService_create_minimal()
-        generated_store_key = resp.json().pop('store_key')
-        self.assertNotEqual('',generated_store_key)  # if store_key is blank upon upload, a uuid4 gets generated.
-        self.assertEqual(uuid.UUID(generated_store_key).version, 4)
-
     def test_MediaService_create_dupeIDs(self):
         PID = 'm3'
         payload = dict(
@@ -88,14 +81,12 @@ class MediaApiTest(TestCase):
             pid_type = 'DEMO',
             identifiers = {'DEMO':PID, 'BIN':'bin_xyz'},
             store_config = self.demostore_dict,
-            store_key = 'eggplant',
         )
         expected = dict(
             pid = PID,
             pid_type = 'DEMO',
             identifiers = {'BIN':'bin_xyz'},
             store_config=self.demostore_dict,
-            store_key = 'eggplant',
             store_status = StoreConfig.PENDING,
             metadata = {},
             tags = [],
@@ -105,6 +96,7 @@ class MediaApiTest(TestCase):
         resp2 = self.client.get(f"/media/{PID}", headers=self.auth_headers)
         received = resp2.json()
         received.pop('pk')
+        received['store_config'].pop('pk')
         received = ordered(received)
         expected = ordered(expected)
         self.assertEqual(received, expected, msg=f'{received} != {expected}')
@@ -120,30 +112,6 @@ class MediaApiTest(TestCase):
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertNotEqual(resp.status_code, 200, msg=resp.content.decode())
-
-    def test_MediaService_create_dupeStoreKeys(self):
-        PID1 = 'storekey_dupe1'
-        storekey_dupe = 'eggplant'
-        payload1 = dict(
-            pid = PID1,
-            pid_type = 'DEMO',
-            store_config = self.demostore_dict,
-            store_key = storekey_dupe,
-        )
-        PID2 = 'storekey_dupe2'
-        payload2 = dict(
-            pid = PID2,
-            pid_type = 'DEMO',
-            store_config = self.demostore_dict,
-            store_key = storekey_dupe,
-        )
-        resp1 = self.client.post("/media", json=payload1, headers=self.auth_headers)
-        self.assertEqual(resp1.status_code, 200, msg=resp1.content.decode())
-        resp2 = self.client.post("/media", json=payload2, headers=self.auth_headers)
-        self.assertEqual(resp2.status_code, 422, msg=resp2.content.decode())
-        content = resp2.json()
-        expected_error = f'store_key "{storekey_dupe}" is not unique with this store_config'
-        self.assertEqual(content["detail"][0]["error"], expected_error)
 
     def test_MediaService_create_bad_identifiers(self):
         PID = 'm333'
@@ -207,7 +175,6 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             store_config = self.demostore_dict,
-            store_key = 'bucketA:xyz',
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
@@ -227,7 +194,6 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             store_config = self.demostore_dict,
-            store_key = 'bucketA:xyz',
             metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'},
             tags = ['one', 'two'],
         )
@@ -236,7 +202,6 @@ class MediaApiTest(TestCase):
         received1 =  resp.json()
         PK = received1['pk']
         payload2 = dict(store_config = self.demostore_dict,
-                        store_key = 'bucketB:abc',
                         identifiers = {'DEMO2':'newvalue'},
                         metadata = {'EGG':'NOG','zip':'ZAP'},
                         tags = ['two', 'three'],)
@@ -245,20 +210,20 @@ class MediaApiTest(TestCase):
         self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
         resp3 = self.client.get(f'/media/{PID}', headers=self.auth_headers)
         self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
-        received3 = ordered(resp3.json())
+        received3 = resp3.json()
+        received3['store_config'].pop('pk')
+        received3 = ordered(received3)
 
         expected = dict(
             pk = PK,
             pid = PID,
             pid_type = 'DEMO',
             store_config = self.demostore_dict,
-            store_key = 'bucketB:abc',
             store_status = StoreConfig.PENDING,
             identifiers = {'DEMO2':'newvalue'},
             metadata = {'egg':'nog', 'EGG':'NOG', 'zip':'ZAP', 'quick':'quack'},
             tags = ['one', 'two', 'three'],
         )
-
         expected = ordered(expected)
         self.assertEqual(received3, expected, msg=f'{received3} != {expected}')
         return PK
@@ -271,7 +236,6 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             store_config = self.demostore_dict,
-            store_key = 'bucketA:xyz',
             metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'},
             tags = ['one two'],
         )
@@ -289,14 +253,15 @@ class MediaApiTest(TestCase):
         self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
         resp3 = self.client.get(f'/media/{PID2}', headers=self.auth_headers)
         self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
-        received3 = ordered(resp3.json())
+        received3 = resp3.json()
+        received3['store_config'].pop('pk')
+        received3 = ordered(received3)
 
         expected = dict(
             pk = PK,
             pid = PID2,
             pid_type = 'DEMO',
             store_config = self.demostore_dict,
-            store_key = '',
             store_status = StoreConfig.PENDING,
             identifiers = {'DEMO2':'newvalue'},
             metadata = {'EGG':'NOG', 'zip':'ZAP'},
@@ -314,7 +279,6 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             store_config = self.demostore_dict,
-            store_key = 'bucketA:xyz',
             metadata = {'egg':'nog', 'zip':'zap', 'quick':'quack'},
             tags = ['one two'],
         )
@@ -333,14 +297,15 @@ class MediaApiTest(TestCase):
         self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
         resp3 = self.client.get(f'/media/{PID2}', headers=self.auth_headers)
         self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
-        received3 = ordered(resp3.json())
+        received3 = resp3.json()
+        received3['store_config'].pop('pk')
+        received3 = ordered(received3)
 
         expected = dict(
             pk = PK,
             pid = PID2,
             pid_type = 'DEMO',
             store_config = self.demostore_dict,
-            store_key = '',
             store_status = StoreConfig.PENDING,
             identifiers = {'DEMO2':'newvalue'},
             metadata = {'EGG':'NOG', 'zip':'ZAP'},
@@ -358,7 +323,6 @@ class MediaApiTest(TestCase):
             pid = PID,
             pid_type = 'DEMO',
             store_config = self.demostore_dict,
-            store_key = 'mystorekey',
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
@@ -371,7 +335,9 @@ class MediaApiTest(TestCase):
         self.assertEqual(resp2.status_code, 204, msg=resp2.content.decode())
         resp3 = self.client.get(f'/media/{PID}', headers=self.auth_headers)
         self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
-        received3 = ordered(resp3.json())
+        received3 = resp3.json()
+        received3['store_config'].pop('pk')
+        received3 = ordered(received3)
 
         expected = dict(
             pk = PK,
@@ -379,7 +345,6 @@ class MediaApiTest(TestCase):
             pid_type = 'DEMO',
             identifiers = {'DEMO2':'newvalue'},
             store_config = self.demostore_dict,
-            store_key = 'mystorekey',
             store_status = StoreConfig.PENDING,
             metadata = {},
             tags = [],
@@ -417,14 +382,12 @@ class MediaVersioningTest(TestCase):
         media = Media.objects.get(pk=PK)
         m1 = media.history.earliest()   # first one   .first() not correrct
         m2 = media.history.latest()     # most recent .last() not correct
-        self.assertEqual(m1.store_key, 'bucketA:xyz')
-        self.assertEqual(m2.store_key, 'bucketB:abc')
 
         self.assertEqual(m1.metadata, {'egg':'nog', 'zip':'zap', 'quick':'quack'})
         self.assertEqual(m2.metadata, {'egg':'nog', 'EGG':'NOG', 'zip':'ZAP', 'quick':'quack'} )
 
         model_diff = m2.diff_against(m1)  # NEWER INSTANCE diff_against OLDER INSTANCE
-        expected_changed_fields = sorted(['store_key','identifiers','metadata'])  # tags is foreign key and not diff'd
+        expected_changed_fields = sorted(['identifiers','metadata'])  # tags is foreign key and not diff'd
         self.assertEqual(sorted(model_diff.changed_fields), expected_changed_fields )
 
         metadata_changes = [modelchange for modelchange in model_diff.changes if modelchange.field=='metadata'][0]
@@ -445,7 +408,7 @@ class MediaVersioningTest(TestCase):
         self.assertEqual(m2.pid, 'm77', msg=m2)
 
         model_diff = m2.diff_against(m1)  # NEWER INSTANCE diff_against OLDER INSTANCE
-        expected_changed_fields = sorted(['pid','store_key','identifiers','metadata'])  # tags is foreign key and not diff'd
+        expected_changed_fields = sorted(['pid','identifiers','metadata'])  # tags is foreign key and not diff'd
         self.assertEqual(sorted(model_diff.changed_fields), expected_changed_fields )
 
         # METADATA dict COMPARE WORKS FOR PATCH (additive) BUT NOT PUT

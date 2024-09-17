@@ -1,25 +1,31 @@
 from typing import List, Optional
 
 from ninja import Schema
-from pydantic import BaseModel, ValidationError, model_validator, field_validator, ValidationInfo
+from pydantic import field_validator
 
 
-class S3ConfigSchema(Schema):
+class S3ConfigSchemaCreate(Schema):
     url: str
     access_key: str
-    secret_key: Optional[str] = ''
+    secret_key: str
 
-class StoreConfigSchema(Schema):
+class S3ConfigSchemaSansKeys(Schema):
+    pk: int
+    url: str
+
+class StoreConfigSchemaCreate(Schema):
     type: str
     bucket: str
-    s3_params: Optional[S3ConfigSchema] = None
+    s3_url: Optional[str] = ''
+
+class StoreConfigSchema(StoreConfigSchemaCreate):
+    pk: int
 
 class MediaSchema(Schema):
     pk: int
     pid: str
     pid_type: str
     store_config: StoreConfigSchema
-    store_key: str
     store_status: str
     identifiers: dict
     metadata: dict
@@ -28,8 +34,7 @@ class MediaSchema(Schema):
 class MediaSchemaCreate(Schema):
     pid: str
     pid_type: str
-    store_config: StoreConfigSchema
-    store_key: Optional[str] = ''
+    store_config: StoreConfigSchemaCreate
     identifiers: Optional[dict] = {}
     metadata: Optional[dict] = {}
     tags: Optional[List[str]] = []
@@ -45,8 +50,7 @@ class MediaSchemaCreate(Schema):
 class MediaSchemaUpdate(MediaSchemaCreate):
     pid: Optional[str] = None
     pid_type: Optional[str] = None
-    store_config: Optional[StoreConfigSchema] = ''
-    store_key: Optional[str] = ''
+    store_config: Optional[StoreConfigSchemaCreate] = None
     identifiers: Optional[dict] = {}
     metadata: Optional[dict] = {}
     tags: Optional[List[str]] = []

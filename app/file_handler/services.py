@@ -51,30 +51,29 @@ class UploadService:
     @staticmethod
     def upload_with_file(payload: UploadSchemaInput) -> UploadSchemaOutput:
         mediadata = MediaService.create(payload.mediadata)  # returns MediaSchema after creating database entry
-        store_config = mediadata.store_config
-        match store_config.type:
+        media = Media.objects.get(pk=mediadata.pk)
+        match media.store_config.type:
             case StoreConfig.FILESYSTEMSTORE:
-                store = storage.fs.FilesystemStore(store_config.bucket)
-                store.put(mediadata.store_key, bytearray(decode64(payload.base64)))
+                store = storage.fs.FilesystemStore(media.store_config.bucket)
+                store.put(media.store_key, bytearray(decode64(payload.base64)))
 
             case StoreConfig.BUCKETSTORE:
-                s3_params = S3Config.objects.get(url=store_config.s3_params.url, access_key=store_config.s3_params.access_key)
                 S3_CLIENT_ARGS = dict(
-                    s3_url = s3_params.url,
-                    s3_access_key = s3_params.access_key,
-                    s3_secret_key = s3_params.secret_key,
-                    bucket_name = store_config.bucket,
+                    s3_url = media.store_config.s3cfg.url,
+                    s3_access_key = media.store_config.s3cfg.access_key,
+                    s3_secret_key = media.store_config.s3cfg.secret_key,
+                    bucket_name = media.store_config.bucket,
                 )
                 with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
-                    store.put(mediadata.store_key, bytearray(decode64(payload.base64)))
+                    store.put(media.store_key, bytearray(decode64(payload.base64)))
 
             case StoreConfig.SQLITESTORE:
-                with storage.db.SqliteStore(store_config.bucket) as store:
-                    store.put(mediadata.store_key, bytearray(decode64(payload.base64)))
+                with storage.db.SqliteStore(media.store_config.bucket) as store:
+                    store.put(media.store_key, bytearray(decode64(payload.base64)))
 
             case StoreConfig.DICTSTORE:
                 store = DictStoreSingleton()
-                store.put(mediadata.store_key, bytearray(decode64(payload.base64)))
+                store.put(media.store_key, bytearray(decode64(payload.base64)))
 
         # set media object successful storage
         MediaService.update_status(mediadata.pid, status=StoreConfig.READY)
@@ -85,13 +84,12 @@ class UploadService:
     def upload_sans_file(payload: UploadSchemaInput) -> UploadSchemaOutput:
         assert payload.mediadata.store_config.type == StoreConfig.BUCKETSTORE
         mediadata = MediaService.create(payload.mediadata)  # returns MediaSchema after creating database entry
-        media = Media.objects.get(pid=mediadata.pid)
-        s3_params = media.store_config.s3_params
+        media = Media.objects.get(pk=mediadata.pk)
         S3_CLIENT_ARGS = dict(
-            s3_url=s3_params.url,
-            s3_access_key=s3_params.access_key,
-            s3_secret_key=s3_params.secret_key,
-            bucket_name=media.store_config.bucket,
+            s3_url = media.store_config.s3cfg.url,
+            s3_access_key = media.store_config.s3cfg.access_key,
+            s3_secret_key = media.store_config.s3cfg.secret_key,
+            bucket_name = media.store_config.bucket,
         )
         with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
             put_url = store.presigned_put(media.store_key)
@@ -112,30 +110,29 @@ class DownloadService:
     @staticmethod
     def download_direct(payload: DownloadSchemaInput) -> DownloadSchemaOutput:
         mediadata = MediaService.read(payload.pid)
-        store_config = mediadata.store_config
+        media = Media.objects.get(pk=mediadata.pk)
         match mediadata.store_config.type:
             case StoreConfig.FILESYSTEMSTORE:
-                store = storage.fs.FilesystemStore(store_config.bucket)
-                obj_content = store.get(mediadata.store_key)
+                store = storage.fs.FilesystemStore(mediadata.store_config.bucket)
+                obj_content = store.get(media.store_key)
 
             case StoreConfig.BUCKETSTORE:
-                s3_params = S3Config.objects.get(url=store_config.s3_params.url, access_key=store_config.s3_params.access_key)
                 S3_CLIENT_ARGS = dict(
-                    s3_url = s3_params.url,
-                    s3_access_key = s3_params.access_key,
-                    s3_secret_key = s3_params.secret_key,
-                    bucket_name = store_config.bucket,
+                    s3_url = media.store_config.s3cfg.url,
+                    s3_access_key = media.store_config.s3cfg.access_key,
+                    s3_secret_key = media.store_config.s3cfg.secret_key,
+                    bucket_name = media.store_config.bucket,
                 )
                 with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
-                    obj_content = store.get(mediadata.store_key)
+                    obj_content = store.get(media.store_key)
 
             case StoreConfig.SQLITESTORE:
-                with storage.db.SqliteStore(store_config.bucket) as store:
-                    obj_content = store.get(mediadata.store_key)
+                with storage.db.SqliteStore(media.store_config.bucket) as store:
+                    obj_content = store.get(media.store_key)
 
             case StoreConfig.DICTSTORE:
                 store = DictStoreSingleton()
-                obj_content = store.get(mediadata.store_key)
+                obj_content = store.get(media.store_key)
 
         # converting obj_content bytes to base64
         b64_content = encode64(obj_content)
@@ -146,11 +143,10 @@ class DownloadService:
     def download_link(payload: DownloadSchemaInput) -> DownloadSchemaOutput:
         media = Media.objects.get(pid=payload.pid)
         assert media.store_config.type == StoreConfig.BUCKETSTORE
-        s3_params = media.store_config.s3_params
         S3_CLIENT_ARGS = dict(
-            s3_url=s3_params.url,
-            s3_access_key=s3_params.access_key,
-            s3_secret_key=s3_params.secret_key,
+            s3_url=media.store_config.s3cfg.url,
+            s3_access_key=media.store_config.s3cfg.access_key,
+            s3_secret_key=media.store_config.s3cfg.secret_key,
             bucket_name=media.store_config.bucket,
         )
         with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
