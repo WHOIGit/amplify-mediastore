@@ -74,10 +74,10 @@ class UploadService:
 
         # set media object successful storage
         #MediaService.update_status(media.pid, status=StoreConfig.READY)
-        media.status = StoreConfig.READY
+        media.store_status = StoreConfig.READY
         media.save()
 
-        return UploadSchemaOutput(status=media.status)
+        return UploadSchemaOutput(status=media.store_status)
 
     @staticmethod
     def upload_sans_file(payload: UploadSchemaInput) -> UploadSchemaOutput:
@@ -106,7 +106,7 @@ class DownloadService:
 
     @staticmethod
     def download_direct(payload: DownloadSchemaInput) -> DownloadSchemaOutput:
-        media = Media.objects.get(pk=payload.pk)
+        media = Media.objects.get(pid=payload.pid)
         match media.store_config.type:
             case StoreConfig.FILESYSTEMSTORE:
                 store = storage.fs.FilesystemStore(media.store_config.bucket)
