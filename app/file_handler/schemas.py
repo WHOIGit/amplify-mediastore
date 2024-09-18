@@ -26,7 +26,6 @@ class DownloadSchemaOutput(Schema):
     mediadata: MediaSchema
     base64: Optional[str] = ''
     presigned_get: Optional[str] = ''
-    # TODO verify that at-least/only file or link is not None
 
 class DownloadError(Schema):
     error: str

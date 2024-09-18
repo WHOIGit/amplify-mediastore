@@ -36,7 +36,6 @@ class S3ConfigService:
     def delete(pk: int):
         s3cfg = S3Config.objects.get(pk=pk)
         s3cfg.delete()
-        # TODO also remove object store objects?
 
     @staticmethod
     def list() -> list[S3ConfigSchemaSansKeys]:
@@ -199,6 +198,7 @@ class MediaService:
     @staticmethod
     def delete(pid: str) -> None:
         media = Media.objects.get(pid=pid)
+        # TODO also remove object store object?
         return media.delete()
 
     @staticmethod
