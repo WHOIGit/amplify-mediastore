@@ -5,8 +5,7 @@ from .models import StoreConfig, S3Config, IdentityType
 class StoreConfigAdmin(admin.ModelAdmin):
     list_display = ('pk', 'type', 'bucket', 's3cfg__url', 's3cfg__pk')
     def s3cfg__url(self, obj):
-        print(obj.s3cfg)
-        return obj.s3cfg.s3_url if obj.s3cfg else ''
+        return obj.s3cfg.url if obj.s3cfg else ''
     def s3cfg__pk(self, obj):
         return obj.s3cfg.pk if obj.s3cfg else ''
 
