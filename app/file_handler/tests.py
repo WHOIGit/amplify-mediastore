@@ -40,7 +40,7 @@ class FileHandlerFilestoreTests(TestCase):
         self.client = TestClient(api, headers=self.auth_headers)
 
     def test_updown_ram(self):
-        PID = 'RAMuploadPID'
+        PID = 'test_updown_ram'
         mediadata = dict(MediaSchemaCreate(
             pid = PID, pid_type = 'DEMO',
             store_config = self.storeconfig_dict))
@@ -95,7 +95,7 @@ class FileHandlerS3storeTests(TestCase):
                 store.delete(media.store_key)
 
     def test_updown_s3_direct(self):
-        PID = 'S3uploadPID'
+        PID = 'test_updown_s3_direct'
         mediadata = dict(MediaSchemaCreate(
             pid = PID, pid_type = 'DEMO',
             store_config = self.s3store_dict))
@@ -120,7 +120,7 @@ class FileHandlerS3storeTests(TestCase):
 
     @skipIf(requests is None, 'requests module unavailable')
     def test_updown_s3_presigned(self):
-        PID = 'S3updownPresigned'
+        PID = 'test_updown_s3_presigned'
         mediadata = dict(MediaSchemaCreate(
             pid=PID, pid_type='DEMO',
             store_config=self.s3store_dict))
@@ -155,7 +155,7 @@ class FileHandlerDictstoreTests(TestCase):
         self.storeconfig_dict = dict(StoreConfigSchemaCreate(type=StoreConfig.DICTSTORE, bucket='/demobucket'))
 
     def test_updown_RAM(self):
-        PID = 'RAMuploadPID'
+        PID = 'test_updown_RAM'
         mediadata = dict(MediaSchemaCreate(
             pid = PID, pid_type = 'DEMO',
             store_config = self.storeconfig_dict))
@@ -185,7 +185,7 @@ class FileHandlerSqlitestoreTests(TestCase):
             type=StoreConfig.SQLITESTORE, bucket='/demobucket/demodb.sqlite3'))
 
     def test_updown_Sqlite(self):
-        PID = 'SqlitePID'
+        PID = 'test_updown_Sqlite'
         mediadata = dict(
             pid = PID, pid_type = 'DEMO',
             store_config = self.storeconfig_dict)

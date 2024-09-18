@@ -16,11 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.views.generic import TemplateView
 
 from .api import api
     # includes mediastore and file_handler routes from *.views
 
 urlpatterns = [
+    path('', TemplateView.as_view(template_name='homepage.html'), name='homepage'),
     path('admin/', admin.site.urls),
     #path('api-auth/', include('rest_framework.urls')),
     path('api/', api.urls),

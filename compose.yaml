@@ -1,16 +1,8 @@
-
 services:
-
-#  db:
-#    image: postgres
-#    volumes:
-#      - ./vols/db:/var/lib/postgresql/data
-#    env_file:
-#      - .env
 
   api:
     build: .
-    command: ./start-django
+    command: ./start-django testonly
     volumes:
       - ./app:/app
       - ./vols/db:/db
@@ -18,5 +10,3 @@ services:
       - "8000:8000"
     env_file:
       - .env
-#    depends_on:
-#      - db

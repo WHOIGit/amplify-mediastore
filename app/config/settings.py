@@ -71,7 +71,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR/'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -90,18 +90,21 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join('/db', 'db.sqlite3'),
-        'OPTIONS': {'timeout': 2, }  # in seconds
-#        'ENGINE': 'django.db.backends.postgresql',
-#        'NAME': os.environ.get('POSTGRES_DB'),
-#        'USER': os.environ.get('POSTGRES_USER'),
-#        'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
-#        'HOST': 'db',
-#        'PORT': 5432,
+default = {'ENGINE': 'django.db.backends.sqlite3',
+           'NAME': os.path.join('/db', 'db.sqlite3'),
+           'OPTIONS': {'timeout': 2, }}
+if 'POSTGRES_DB' in os.environ and os.environ['POSTGRES_DB']:
+    default = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB'),
+        'USER': os.environ.get('POSTGRES_USER'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
+        'HOST': 'db',
+        'PORT': 5432,
     }
+
+DATABASES = {
+    'default': default,
 }
 
 

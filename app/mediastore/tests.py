@@ -21,6 +21,12 @@ def ordered(obj):
     else:
         return obj
 
+def whoami():
+    import inspect
+    return inspect.stack()[1][3]
+def whosdaddy():
+    import inspect
+    return inspect.stack()[2][3]
 
 class MediaApiTest(TestCase):
 
@@ -52,7 +58,7 @@ class MediaApiTest(TestCase):
         self.assertEqual(resp2.status_code, 200, msg=resp2.content.decode())
 
     def test_MediaService_create(self):
-        PID = 'm1'
+        PID = whoami()
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
@@ -64,7 +70,7 @@ class MediaApiTest(TestCase):
 
     def test_MediaService_create_minimal(self):
         # minimal create
-        PID = 'm2'
+        PID = whoami()
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
@@ -75,7 +81,7 @@ class MediaApiTest(TestCase):
         return resp
 
     def test_MediaService_create_dupeIDs(self):
-        PID = 'm3'
+        PID = whoami()
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
@@ -102,7 +108,7 @@ class MediaApiTest(TestCase):
         self.assertEqual(received, expected, msg=f'{received} != {expected}')
 
     def test_MediaService_create_dupeIDs_ambiguous(self):
-        PID = 'm33'
+        PID = whoami()
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
@@ -114,7 +120,7 @@ class MediaApiTest(TestCase):
         self.assertNotEqual(resp.status_code, 200, msg=resp.content.decode())
 
     def test_MediaService_create_bad_identifiers(self):
-        PID = 'm333'
+        PID = whoami()
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
@@ -127,7 +133,7 @@ class MediaApiTest(TestCase):
         self.assertEqual(content["detail"][0]["ctx"]["error"], "Identifier (dict val) must be string")
 
     def test_MediaService_create_bad_identifier_types(self):
-        PID = 'm3333'
+        PID = whoami()
         payload = dict(
             pid = PID,
             pid_type = 'DEMOxxx',
@@ -151,7 +157,7 @@ class MediaApiTest(TestCase):
         self.assertEqual(content["detail"][0]["error"], "bad identifier_type: BINxxx", content["detail"])
 
     def test_MediaService_create_uniquecheck(self):
-        PID = 'm4'
+        PID = whoami()
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
@@ -166,11 +172,11 @@ class MediaApiTest(TestCase):
         )
         resp2 = self.client.post("/media", json=demo2, headers=self.auth_headers)
         content = resp2.json()
-        expected_error = "<class 'django.db.utils.IntegrityError'>:UNIQUE constraint failed: mediastore_media.pid"
-        self.assertEqual(content["detail"][0]["error"], expected_error, content["detail"])
+        expected_error = "django.db.utils.IntegrityError"
+        self.assertIn(expected_error, content["detail"][0]["error"], content["detail"])
 
     def test_MediaService_create_read_delete(self):
-        PID = 'm5'
+        PID = whoami()
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
@@ -189,7 +195,7 @@ class MediaApiTest(TestCase):
 
 
     def test_create_patch(self):
-        PID = 'm6'
+        PID = f'{whosdaddy()}.{whoami()}'
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
@@ -230,8 +236,8 @@ class MediaApiTest(TestCase):
 
 
     def test_create_put(self):
-        PID = 'm7'
-        PID2 = 'm77'
+        PID = f'{whosdaddy()}.{whoami()}'
+        PID2 = PID+'.UPDATED'
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
@@ -273,8 +279,8 @@ class MediaApiTest(TestCase):
         return PK
 
     def test_create_put_dupeidentifier(self):
-        PID = 'm7'
-        PID2 = 'm77'
+        PID = whoami()
+        PID2 = PID+'.UPDATED'
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
@@ -318,7 +324,7 @@ class MediaApiTest(TestCase):
 
 
     def test_create_patch_dupeidentifiers(self):
-        PID = 'm6'
+        PID = whoami()
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
@@ -355,7 +361,7 @@ class MediaApiTest(TestCase):
 
 
     def test_create_patch_dupeidentifiers_AMBIGUOUS(self):
-        PID = 'm66'
+        PID = whoami()
         payload = dict(
             pid = PID,
             pid_type = 'DEMO',
@@ -404,8 +410,8 @@ class MediaVersioningTest(TestCase):
         media = Media.objects.get(pk=PK)
         m1 = media.history.earliest()   # first one   .first() not correrct
         m2 = media.history.latest()     # most recent .last() not correct
-        self.assertEqual(m1.pid, 'm7', msg=m1)
-        self.assertEqual(m2.pid, 'm77', msg=m2)
+        self.assertEqual(m1.pid, 'test_Versioning_put.test_create_put', msg=m1)
+        self.assertEqual(m2.pid, 'test_Versioning_put.test_create_put.UPDATED', msg=m2)
 
         model_diff = m2.diff_against(m1)  # NEWER INSTANCE diff_against OLDER INSTANCE
         expected_changed_fields = sorted(['pid','identifiers','metadata'])  # tags is foreign key and not diff'd
@@ -438,7 +444,7 @@ class StoreCRUDTests(TestCase):
 
         received = resp.json()
         PK = received['pk']
-        expected = dict(pk=1, type='FilesystemStore', bucket='/demobucket', s3_url='')
+        expected = dict(pk=PK, type='FilesystemStore', bucket='/demobucket', s3_url='')
 
         received,expected = ordered(received),ordered(expected)
         self.assertEqual(received, expected)
@@ -491,7 +497,7 @@ class StoreCRUDTests(TestCase):
 
         # GET S3CFG list
         resp = self.client.get(f"/s3cfgs")
-        expected = dict(S3ConfigSchemaSansKeys(pk=1, url=url2))
+        expected = dict(S3ConfigSchemaSansKeys(pk=S3CFG_PK, url=url2))
         self.assertEqual(ordered(resp.json()), [ordered(expected)])
 
 
@@ -502,7 +508,7 @@ class StoreCRUDTests(TestCase):
 
         received = resp.json()
         STORE_PK = received['pk']
-        expected = dict(pk=1, type='BucketStore', bucket='/demobucket', s3_url=url2)
+        expected = dict(pk=STORE_PK, type='BucketStore', bucket='/demobucket', s3_url=url2)
 
         received,expected = ordered(received),ordered(expected)
         self.assertEqual(received, expected)

@@ -1,0 +1,20 @@
+services:
+
+  db:
+    image: postgres
+    volumes:
+      - ./vols/db:/var/lib/postgresql/data
+    env_file:
+      - .envprod
+
+  api:
+    image: harbor-registry.whoi.edu/amplify/mediastore:latest
+    command: ./start-django test
+    volumes:
+      - ./vols/db:/db
+    ports:
+      - "8000:8000"
+    env_file:
+      - .envprod
+    depends_on:
+      - db

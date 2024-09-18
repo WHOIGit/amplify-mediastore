@@ -2,8 +2,12 @@
 
 python manage.py makemigrations
 python manage.py migrate
-#python manage.py collectstatic --no-input
-
 python manage.py ensure_admin
 
-python manage.py runserver 0.0.0.0:8000
+if [ "$1" = "test" ] || [ "$1" = "testonly" ] ; then
+  python manage.py test
+fi
+
+if [ "$1" != "testonly" ]; then
+  python manage.py runserver 0.0.0.0:8000
+fi
