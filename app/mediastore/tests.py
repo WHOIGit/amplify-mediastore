@@ -481,9 +481,9 @@ class StoreCRUDTests(TestCase):
         resp = self.client.post("/s3cfg", json=payload)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
         received = resp.json()
-        expected = dict(S3ConfigSchemaSansKeys(pk=1, url=url1))
-        self.assertEqual(ordered(received),ordered(expected))
         S3CFG_PK = received['pk']
+        expected = dict(S3ConfigSchemaSansKeys(pk=S3CFG_PK, url=url1))
+        self.assertEqual(ordered(received),ordered(expected))
 
         # GET S3CFG
         resp = self.client.get(f"/s3cfg/{S3CFG_PK}")
