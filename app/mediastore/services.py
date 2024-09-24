@@ -196,9 +196,16 @@ class MediaService:
         return status
 
     @staticmethod
-    def delete(pid: str) -> None:
+    def delete(pid: str, del_stored=True) -> None:
         media = Media.objects.get(pid=pid)
-        # TODO also remove object store object?
+        store_obj_deleted = None
+        if del_stored and media.store_status==StoreConfig.READY:
+            if media.store_config.storage_is_context_managed:
+                with media.store_config.get_storage_store() as store:
+                    store_obj_deleted = store.delete(media.store_key)
+            else:
+                store = media.store_config.get_storage_store()
+                store_obj_deleted = store.delete(media.store_key)
         return media.delete()
 
     @staticmethod
