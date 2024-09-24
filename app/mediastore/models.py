@@ -4,6 +4,24 @@ from django.core.exceptions import ValidationError
 from taggit.managers import TaggableManager
 from simple_history.models import HistoricalRecords
 
+import storage.fs, storage.s3, storage.db, storage.object
+
+
+class DictStoreSingleton(storage.object.DictStore):
+    """
+    Singleton version of storage.object.DictStore
+    for use in repeat queries to RAMSTORE
+    """
+    _instance = None
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(cls, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+    def __init__(self):
+        # Initialize objects only if not already initialized
+        if not hasattr(self, 'objects'):
+            self.objects = {}
+
 
 class IdentityType(models.Model):
     name = models.CharField(max_length=255, unique=True)
@@ -42,6 +60,44 @@ class StoreConfig(models.Model):
 
     def is_s3_type(self):
         return self.type == self.BUCKETSTORE
+
+    @property
+    def storage_is_context_managed(self):
+        if self.type in [self.BUCKETSTORE, self.SQLITESTORE]:
+            return True
+        return False
+
+    @property
+    def storage_Store_kwargs(self):
+        match self.type:
+            case self.FILESYSTEMSTORE:
+                return dict(root_path=self.bucket)
+            case self.SQLITESTORE:
+                return dict(db_path=self.bucket)
+            case self.DICTSTORE:
+                return dict()
+            case self.BUCKETSTORE:
+                return dict(
+                    s3_url = self.s3cfg.url,
+                    s3_access_key = self.s3cfg.access_key,
+                    s3_secret_key = self.s3cfg.secret_key,
+                    bucket_name = self.bucket)
+
+    def get_storage_Store(self):
+        match self.type:
+            case self.FILESYSTEMSTORE:
+                return storage.fs.FilesystemStore
+            case self.SQLITESTORE:
+                return storage.db.SqliteStore
+            case self.DICTSTORE:
+                return DictStoreSingleton
+                #return storage.object.DictStore
+            case self.BUCKETSTORE:
+                return storage.s3.BucketStore
+
+    def get_storage_store(self):
+        Store = self.get_storage_Store()
+        return Store(**self.storage_Store_kwargs)
 
 
 class Media(models.Model):
