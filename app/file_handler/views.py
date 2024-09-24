@@ -12,6 +12,7 @@ from file_handler.services import UploadService, DownloadService
 
 @upload_router.post('', response={200:UploadSchemaOutput, 401:UploadError})
 def upload_media(request, payload:UploadSchemaInput):
+    #return 200, UploadService.upload(payload)
     try:
         return 200, UploadService.upload(payload)
     except Exception as e:
@@ -19,6 +20,7 @@ def upload_media(request, payload:UploadSchemaInput):
 
 @download_router.get('/{pid}', response={200:DownloadSchemaOutput, 401:DownloadError})
 def download_media(request, pid):
+    #return 200, DownloadService.download(DownloadSchemaInput(pid=pid, direct=True))
     try:
         payload = DownloadSchemaInput(pid=pid, direct=True)
         return 200, DownloadService.download(payload)
@@ -27,6 +29,7 @@ def download_media(request, pid):
 
 @download_router.get('/url/{pid}', response={200:DownloadSchemaOutput, 401:DownloadError})
 def download_media_url(request, pid):
+    #return 200, DownloadService.download(DownloadSchemaInput(pid=pid, direct=False))
     try:
         payload = DownloadSchemaInput(pid=pid, direct=False)
         return 200, DownloadService.download(payload)
