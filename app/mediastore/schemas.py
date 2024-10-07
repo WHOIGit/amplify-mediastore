@@ -55,6 +55,18 @@ class MediaSchemaUpdate(MediaSchemaCreate):
     metadata: Optional[dict] = {}
     tags: Optional[List[str]] = []
 
+class MediaErrorSchema(Schema):
+    pid: str
+    error: str
+    msg: str
+
+class BulkUpdateResponseSchema(Schema):
+    successes: list[str]
+    failures: list[MediaErrorSchema]
+
+class MediaSearchSchema(Schema):
+    tags: list[str]
+    # TODO other search vectors
 
 class LoginInputDTO(Schema):
     username: str

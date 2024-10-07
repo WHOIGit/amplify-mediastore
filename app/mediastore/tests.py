@@ -9,7 +9,8 @@ from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 
 from .models import Media, IdentityType, StoreConfig
-from .schemas import StoreConfigSchema, StoreConfigSchemaCreate, S3ConfigSchemaCreate, S3ConfigSchemaSansKeys
+from .schemas import StoreConfigSchema, StoreConfigSchemaCreate, S3ConfigSchemaCreate, S3ConfigSchemaSansKeys, \
+    MediaSearchSchema
 
 from config.api import api
 
@@ -376,6 +377,39 @@ class MediaApiTest(TestCase):
                         )
         resp2 = self.client.patch(f'/media/{PID}', json=payload2, headers=self.auth_headers)
         self.assertEqual(resp2.status_code, 422, msg=resp2.content.decode())
+
+    # TODO test POST /medias /medias/create /medias/read /medias/delete  PUT\PATCH /medias/update
+
+    def test_BULK_create_read_delete(self):
+        TAG = 'BULK'
+        PID1 = whoami()+'_1'
+        PID2 = whoami()+'_2'
+        payload = [dict(pid=PID1, pid_type='DEMO', store_config=self.demostore_dict, tags=[TAG]),
+                   dict(pid=PID2, pid_type='DEMO', store_config=self.demostore_dict, tags=[TAG]),]
+
+        resp = self.client.post("/medias/create", json=payload, headers=self.auth_headers)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+
+        payload = dict(MediaSearchSchema(tags=[TAG]))
+        resp = self.client.post("/medias/search", json=payload, headers=self.auth_headers)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        received_search = sorted(resp.json(), key=lambda m: m['pid'])
+        pids = [m['pid'] for m in received_search]
+        self.assertEqual(pids, sorted([PID1,PID2]), msg=resp.content.decode())
+
+        resp = self.client.post("/medias/read", json=[PID1, PID2], headers=self.auth_headers)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        received_read = sorted(resp.json(), key=lambda m: m['pid'])
+        self.assertEqual(received_read, received_search)
+
+        # todo PUT
+        # todo PATCH
+
+        resp = self.client.post("/medias/delete", json=[PID1, PID2], headers=self.auth_headers)
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        expected = dict(successes=[PID1,PID2], failures=[])
+        received_delete = resp.json()
+        self.assertEqual(received_delete, expected)
 
 
 class MediaVersioningTest(TestCase):

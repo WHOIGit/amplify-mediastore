@@ -28,5 +28,7 @@ class DownloadSchemaOutput(Schema):
     presigned_get: Optional[str] = ''
 
 class DownloadError(Schema):
+    pid: str
     error: str
+    msg: str
 

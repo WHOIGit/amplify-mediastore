@@ -141,6 +141,12 @@ class FileHandlerS3storeTests(TestCase):
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
         presigned_get = json.loads(resp.content.decode())['presigned_get']
 
+        # Fetching presigned S3 GET urls list
+        resp = self.client.post(f"/download/urls", json=[PID])
+        self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
+        presigned_gets = [dso['presigned_get'] for dso in json.loads(resp.content.decode())]
+        self.assertEqual([presigned_get],presigned_gets)
+
         # Downloading file using presigned GET url.
         # Filename of uploaded file totally ignored, store_key gets used instead.
         download_response = requests.get(presigned_get)
