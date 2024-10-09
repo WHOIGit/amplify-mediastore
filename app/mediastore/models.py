@@ -1,3 +1,5 @@
+import os
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
@@ -77,11 +79,14 @@ class StoreConfig(models.Model):
             case self.DICTSTORE:
                 return dict()
             case self.BUCKETSTORE:
-                return dict(
+                kwargs = dict(
                     s3_url = self.s3cfg.url,
                     s3_access_key = self.s3cfg.access_key,
                     s3_secret_key = self.s3cfg.secret_key,
                     bucket_name = self.bucket)
+                if proxy:=os.environ.get('HTTP_PROXY'):
+                    kwargs['botocore_config_kwargs'] = dict(proxies={'http':proxy})
+                return kwargs
 
     def get_storage_Store(self):
         match self.type:

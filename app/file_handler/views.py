@@ -1,6 +1,4 @@
-from ninja import Router, File, Form
-from ninja.files import UploadedFile
-
+from ninja import Router
 
 upload_router = Router()
 download_router = Router()

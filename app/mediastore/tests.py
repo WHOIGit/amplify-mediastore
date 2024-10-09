@@ -507,9 +507,9 @@ class StoreCRUDTests(TestCase):
 
     def test_store_crud_s3(self):
         # CREATE S3CFG
-        url1 = os.getenv('TESTS_S3_URL','https://my.endpoint.s3')
-        access_key = os.getenv('TESTS_S3_ACCESS','bingus')
-        secret_key = os.getenv('TESTS_S3_SECRET','secretbingus')
+        url1 = os.getenv('TESTS_S3_URL') or 'https://my.endpoint.s3'
+        access_key = os.getenv('TESTS_S3_ACCESS') or 'bingus'
+        secret_key = os.getenv('TESTS_S3_SECRET') or 'secretbingus'
         payload = dict(S3ConfigSchemaCreate(url=url1, access_key=access_key, secret_key=secret_key))
 
         resp = self.client.post("/s3cfg", json=payload)

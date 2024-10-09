@@ -2,7 +2,7 @@ import os
 import base64
 import uuid
 import json
-from unittest import skipIf
+from unittest import skipIf, skipUnless
 
 os.environ["NINJA_SKIP_REGISTRY"] = "yes"
 
@@ -64,7 +64,7 @@ class FileHandlerFilestoreTests(TestCase):
         self.assertEqual(downloaded_content, upload_content)
 
 
-@skipIf('TESTS_S3_URL' not in os.environ or not os.environ['TESTS_S3_URL'], '"TESTS_S3_URL" env variable not set in')
+@skipUnless(os.environ.get('TESTS_S3_URL'), '"TESTS_S3_URL" env variable set')
 class FileHandlerS3storeTests(TestCase):
     def setUp(self):
         IdentityType.objects.create(name='DEMO')
@@ -85,11 +85,13 @@ class FileHandlerS3storeTests(TestCase):
         import storage.s3
         medias = Media.objects.all()
         for media in medias:
+            proxies = dict(proxies={'http': os.environ.get('HTTP_PROXY')}) if os.environ.get('HTTP_PROXY') else None
             S3_CLIENT_ARGS = dict(
                 s3_url=media.store_config.s3cfg.url,
                 s3_access_key=media.store_config.s3cfg.access_key,
                 s3_secret_key=media.store_config.s3cfg.secret_key,
                 bucket_name=media.store_config.bucket,
+                botocore_config_kwargs = proxies
             )
             with storage.s3.BucketStore(**S3_CLIENT_ARGS) as store:
                 store.delete(media.store_key)
