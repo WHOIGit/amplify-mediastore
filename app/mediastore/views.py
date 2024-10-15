@@ -1,7 +1,8 @@
 from ninja import Router
 
 from mediastore.schemas import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate, \
-    MediaSearchSchema, BulkUpdateResponseSchema, MediaErrorSchema
+    MediaSearchSchema, BulkUpdateResponseSchema, MediaErrorSchema, MediaSchemaUpdateTags, MediaSchemaUpdateStorekey, \
+    MediaSchemaUpdateIdentifiers, MediaSchemaUpdateMetadata
 from mediastore.schemas import StoreConfigSchema, StoreConfigSchemaCreate, S3ConfigSchemaSansKeys, S3ConfigSchemaCreate
 from mediastore.schemas import LoginInputDTO, TokenOutputDTO, ErrorDTO
 from mediastore.services import MediaService, StoreService, S3ConfigService
@@ -23,89 +24,94 @@ def hello(request):
     return {"msg": "Hello, world!"}
 
 
-## MEDIA ##
-
-@router.get('/medias', response=list[MediaSchema])
-def list_media(request):
-    return MediaService.list_media()
-
-@router.post('/media', response=MediaSchema)
-def create_media(request, media: MediaSchemaCreate):
-    return MediaService.create(media)
-
-@router.get('/media/{pid}', response=MediaSchema)
-def read_media(request, pid: str):
-    return MediaService.read(pid)
-
-@router.patch('/media/{pid}', response={204: int})
-def patch_media(request, pid: str, media: MediaSchemaUpdate):
-    MediaService.patch(pid, media)
-    return 204
-
-@router.put('/media/{pid}', response={204: int})
-def put_media(request, pid: str, media: MediaSchemaUpdate):
-    MediaService.put(pid, media)
-    return 204
-
-@router.delete('/media/{pid}', response={204: int})
-def delete_media(request, pid: str):
-    MediaService.delete(pid)
-    return 204
-
-
 ## MEDIA BULK ##
 
-@router.post('/medias/search', response=list[MediaSchema])
-def search_medias(request, search_params:MediaSearchSchema):
+@router.post('/media/search', response=list[MediaSchema])
+def media_search(request, search_params:MediaSearchSchema):
     return MediaService.search(search_params)
 
-@router.post('/medias/create', response=list[MediaSchema])
-def create_medias(request, medias: list[MediaSchemaCreate]):
+@router.post('/media/create', response=list[MediaSchema])
+def media_create(request, medias: list[MediaSchemaCreate]):
     created_media = []
     for media in medias:
         created_media.append( MediaService.create(media) )
     return created_media
 
-@router.post('/medias/read', response=list[MediaSchema])
-def read_medias(request, pids: list[str]):
+@router.post('/media/read', response=list[MediaSchema])
+def media_read(request, pids: list[str]):
     # TODO list failed efforts?
     return MediaService.bulk_read(pids)
 
-@router.patch('/medias/update', response=BulkUpdateResponseSchema)
+def bulk_update_response(payload:list, function):
+    successes = []
+    failures = []
+    for elem in payload:
+        pid = elem if isinstance(elem,str) else elem.pid
+        try:
+            resp = function(elem)
+            successes.append(pid)
+        except Exception as e:
+            failures.append( MediaErrorSchema(pid=pid, error=str(type(e)), msg=str(e)) )
+    return BulkUpdateResponseSchema(successes=successes, failures=failures)
+
+@router.post('/media/delete', response=BulkUpdateResponseSchema)
+def media_delete(request, pids: list[str]):
+    return bulk_update_response(pids, MediaService.delete)
+
+@router.patch('/media/update/tags', response=BulkUpdateResponseSchema)
+def media_update_tags_add(request, payload: list[MediaSchemaUpdateTags]):
+    return bulk_update_response(payload, MediaService.update_tags_add)
+@router.put('/media/update/tags', response=BulkUpdateResponseSchema)
+def media_update_tags_put(request, payload: list[MediaSchemaUpdateTags]):
+    return bulk_update_response(payload, MediaService.update_tags_put)
+
+@router.put('/media/update/storekeys', response=BulkUpdateResponseSchema)
+def media_update_storekeys(request, payload: list[MediaSchemaUpdateStorekey]):
+    return bulk_update_response(payload, MediaService.update_storekey)
+
+@router.put('/media/update/identifiers', response=BulkUpdateResponseSchema)
+def media_update_identifiers(request, payload: list[MediaSchemaUpdateIdentifiers]):
+    return bulk_update_response(payload, MediaService.update_identifiers)
+
+@router.put('/media/update/metadata', response=BulkUpdateResponseSchema)
+def media_update_metadata_put(request, payload: list[MediaSchemaUpdateMetadata]):
+    return bulk_update_response(payload, MediaService.update_metadata_put)
+@router.patch('/media/update/metadata', response=BulkUpdateResponseSchema)
+def media_update_metadata_patch(request, payload: list[MediaSchemaUpdateMetadata]):
+    return bulk_update_response(payload, MediaService.update_metadata_patch)
+@router.delete('/media/update/metadata', response=BulkUpdateResponseSchema)
+def media_update_metadata_delete(request, payload: list[MediaSchemaUpdateMetadata]):
+    return bulk_update_response(payload, MediaService.update_metadata_delete)
+
+@router.patch('/media/update', response=BulkUpdateResponseSchema)
 def patch_medias(request, pids: list[str], medias: list[MediaSchemaUpdate]):
-    successes = []
-    failures = []
-    for pid,media in zip(pids,medias):
-        try:
-            MediaService.patch(pid, media)
-            successes.append(pid)
-        except Exception as e:
-            failures.append( MediaErrorSchema(pid=pid, error=str(type(e)), msg=str(e)) )
-    return BulkUpdateResponseSchema(successes=successes, failures=failures)
+    return bulk_update_response(pids, MediaService.patch)
 
-@router.put('/medias/update', response=BulkUpdateResponseSchema)
-def put_medias(request, pids: list[str], medias: list[MediaSchemaUpdate]):
-    successes = []
-    failures = []
-    for pid,media in zip(pids,medias):
-        try:
-            MediaService.put(pid, media)
-            successes.append(pid)
-        except Exception as e:
-            failures.append( MediaErrorSchema(pid=pid, error=str(type(e)), msg=str(e)) )
-    return BulkUpdateResponseSchema(successes=successes, failures=failures)
 
-@router.post('/medias/delete', response=BulkUpdateResponseSchema)
-def delete_medias(request, pids: list[str]):
-    successes = []
-    failures = []
-    for pid in pids:
-        try:
-            MediaService.delete(pid)
-            successes.append(pid)
-        except Exception as e:
-            failures.append( MediaErrorSchema(pid=pid, error=str(type(e)), msg=str(e)) )
-    return BulkUpdateResponseSchema(successes=successes, failures=failures)
+## MEDIA ##
+
+@router.get('/media/dump', response=list[MediaSchema])
+def list_media(request):
+    return MediaService.list_media()
+
+@router.post('/media', response=MediaSchema)
+def media_create_single(request, media: MediaSchemaCreate):
+    return MediaService.create(media)
+
+@router.get('/media/{pid}', response=MediaSchema)
+def media_read_single(request, pid: str):
+    return MediaService.read(pid)
+
+@router.delete('/media/{pid}', response={204: int})
+def media_delete_single(request, pid: str):
+    MediaService.delete(pid)
+    return 204
+
+@router.patch('/media/{pid}', response={204: int})
+def media_patch_single(request, pid: str, payload: MediaSchemaUpdate):
+    payload.pid = pid
+    MediaService.patch(payload)
+    return 204
 
 
 ## STORE CONFIG ##

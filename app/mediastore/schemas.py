@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Dict, Optional, Union
 
 from ninja import Schema
 from pydantic import field_validator
@@ -35,25 +35,32 @@ class MediaSchemaCreate(Schema):
     pid: str
     pid_type: str
     store_config: StoreConfigSchemaCreate
-    identifiers: Optional[dict] = {}
+    identifiers: Optional[Dict[str,str]] = {}
     metadata: Optional[dict] = {}
     tags: Optional[List[str]] = []
 
-    @field_validator('identifiers')
-    @classmethod
-    def check_identifiers(cls, identifiers: dict) -> dict:
-        for key,val in identifiers.items():
-            assert isinstance(key,str), 'IdentifierType (dict key) must be string'
-            assert isinstance(val,str), 'Identifier (dict val) must be string'
-        return identifiers
-
-class MediaSchemaUpdate(MediaSchemaCreate):
+class MediaSchemaUpdate(Schema):
     pid: Optional[str] = None
+    new_pid: Optional[str] = None
     pid_type: Optional[str] = None
-    store_config: Optional[StoreConfigSchemaCreate] = None
-    identifiers: Optional[dict] = {}
-    metadata: Optional[dict] = {}
-    tags: Optional[List[str]] = []
+    store_config: Optional[Union[int,StoreConfigSchemaCreate]] = None
+
+class MediaSchemaUpdateTags(Schema):
+    pid: str
+    tags: List[str]
+
+class MediaSchemaUpdateStorekey(Schema):
+    pid: str
+    store_key: str
+
+class MediaSchemaUpdateIdentifiers(Schema):
+    pid: str
+    identifiers: Dict[str,str]
+
+class MediaSchemaUpdateMetadata(Schema):
+    pid: str
+    keys: Optional[List[str]] = []
+    data: Optional[Union[dict,list]] = {}
 
 class MediaErrorSchema(Schema):
     pid: str

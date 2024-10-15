@@ -3,6 +3,8 @@ import uuid
 # for search
 from operator import and_,or_
 from functools import reduce
+from typing import Union
+
 from django.db.models import Q
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -11,7 +13,9 @@ from ninja.errors import ValidationError, HttpError
 
 from mediastore.models import Media, IdentityType, StoreConfig, S3Config
 from mediastore.schemas import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate, StoreConfigSchema, \
-    StoreConfigSchemaCreate, S3ConfigSchemaCreate, S3ConfigSchemaSansKeys, MediaSearchSchema
+    StoreConfigSchemaCreate, S3ConfigSchemaCreate, S3ConfigSchemaSansKeys, MediaSearchSchema, BulkUpdateResponseSchema, \
+    MediaErrorSchema, MediaSchemaUpdateTags, MediaSchemaUpdateStorekey, MediaSchemaUpdateIdentifiers, \
+    MediaSchemaUpdateMetadata
 
 
 class S3ConfigService:
@@ -56,7 +60,7 @@ class StoreService:
         return StoreConfigSchema(pk=store_config.pk, type=store_config.type, bucket=store_config.bucket, s3_url=s3_url)
 
     @staticmethod
-    def clean(payload: type[StoreConfigSchema|StoreConfigSchemaCreate]):
+    def clean(payload: Union[StoreConfigSchema,StoreConfigSchemaCreate]):
         if payload.type not in list(zip(*StoreConfig.TYPES))[0]:
             raise ValidationError([dict(error=f'type "{payload.type}" not supported.')])
         if payload.type == StoreConfig.BUCKETSTORE and not payload.s3_url:
@@ -159,46 +163,21 @@ class MediaService:
         return [MediaService.serialize(media) for media in medias]
 
     @staticmethod
-    def update(pid, payload: MediaSchemaUpdate, putorpatch:str = 'patch') -> None:
-        if putorpatch=='put':
-            return MediaService.put(pid, payload)
-        else:
-            return MediaService.patch(pid, payload)
-
-    @staticmethod
-    def put(pid: str, payload: MediaSchemaUpdate) -> None:
-        store_config,storeconfig_created = StoreService.create(payload.store_config, as_schema=False)
-        media = Media.objects.get(pid=pid)
-        media.pid = payload.pid
-        media.pid_type = payload.pid_type
-        media.store_config = store_config
-        media.identifiers = MediaService.clean_identifiers(payload)
-        media.metadata = payload.metadata
-        media.save()
-        media.tags.set(payload.tags)
-        return media
-
-    @staticmethod
-    def patch(pid: str, payload: MediaSchemaUpdate) -> None:
-        media = Media.objects.get(pid=pid)
-        if payload.pid:
-            media.pid = payload.pid
+    def patch(payload: MediaSchemaUpdate) -> None:
+        media = Media.objects.get(pid=payload.pid)
+        if payload.new_pid:
+            media.pid = payload.new_pid
         if payload.pid_type:
             media.pid_type = payload.pid_type
-        if payload.store_config:
+        if isinstance(payload.store_config,int):
+            store_config = StoreConfig.objects.get(pk=payload.store_config)
+            media.store_config = store_config
+        elif isinstance(payload.store_config,StoreConfigSchemaCreate):
             store_config, storeconfig_created = StoreService.create(payload.store_config, as_schema=False)
             media.store_config = store_config
-        if payload.identifiers:
-            MediaService.clean_identifiers(payload, media_obj=media)  # because sometimes PID is not included
-            media.identifiers.update(**payload.identifiers)
-        if payload.metadata:
-            media.metadata.update(**payload.metadata)
         media.save()
-        if payload.tags:
-            media.tags.add(*payload.tags)
         return media
 
-    #TODO CRUD for metadata,identifiers,tags, store_key SPECIFICALLY
     @staticmethod
     def update_status(pid:str, status:str) -> str:
         media = Media.objects.get(pid=pid)
@@ -225,7 +204,7 @@ class MediaService:
         return [MediaService.serialize(media) for media in medias]
 
     @staticmethod
-    def clean_identifiers(payload: type[MediaSchemaCreate|MediaSchemaUpdate], media_obj: type[Media|None] = None):
+    def clean_identifiers(payload: Union[MediaSchemaCreate,MediaSchemaUpdateIdentifiers], media_obj: Union[Media,None] = None):
         pop_me = None
         if media_obj:
             pid, pid_type = media_obj.pid, media_obj.pid_type
@@ -248,4 +227,63 @@ class MediaService:
         # TODO other search vectors
         medias = Media.objects.filter( reduce(and_,andQs) )
         return [MediaService.serialize(media) for media in medias]
+
+    @staticmethod
+    def update_tags_add(payload: MediaSchemaUpdateTags):
+        media = Media.objects.get(pid=payload.pid)
+        media.tags.add(*payload.tags)
+
+    @staticmethod
+    def update_tags_put(payload: MediaSchemaUpdateTags):
+        media = Media.objects.get(pid=payload.pid)
+        media.tags.set(payload.tags)
+
+    @staticmethod
+    def update_storekey(payload: MediaSchemaUpdateStorekey):
+        media = Media.objects.get(pid=payload.pid)
+        media.store_key = payload.store_key
+        media.save()
+
+    @staticmethod
+    def update_identifiers(payload: MediaSchemaUpdateIdentifiers):
+        media = Media.objects.get(pid=payload.pid)
+        media.identifiers = MediaService.clean_identifiers(payload,media)
+        media.save()
+
+    @staticmethod
+    def update_metadata_put(payload: MediaSchemaUpdateMetadata):
+        media = Media.objects.get(pid=payload.pid)
+        if payload.keys:
+            dic = media.metadata
+            for key in payload.keys[:-1]:
+                dic = dic.setdefault(key, {})
+            media.metadata[payload.keys[-1]] = payload.data
+        else:
+            media.metadata = payload.data
+        media.save()
+
+    @staticmethod
+    def update_metadata_patch(payload: MediaSchemaUpdateMetadata):
+        media = Media.objects.get(pid=payload.pid)
+        if payload.keys:
+            dic = media.metadata
+            for key in payload.keys[:-1]:
+                dic = dic.setdefault(key, {})
+            dic[payload.keys[-1]].update(payload.data)
+        else:
+            media.metadata.update(payload.data)
+        media.save()
+
+    @staticmethod
+    def update_metadata_delete(payload: MediaSchemaUpdateMetadata):
+        media = Media.objects.get(pid=payload.pid)
+
+        dic = media.metadata
+        if payload.keys:
+            for key in payload.keys[:-1]:
+                dic = dic.setdefault(key, {})
+            del dic[payload.keys[-1]]
+        else:
+            media.metadata = None
+        media.save()
 
