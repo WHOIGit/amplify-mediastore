@@ -3,7 +3,7 @@ from ninja import Router
 upload_router = Router()
 download_router = Router()
 
-from typing import Union
+from typing import Union, List
 from schemas.mediastore import MediaErrorSchema
 from schemas.mediastore import UploadSchemaInput, UploadSchemaOutput, UploadError, \
                                  DownloadSchemaInput, DownloadSchemaOutput
@@ -20,7 +20,7 @@ def upload_media(request, payload:UploadSchemaInput):
 
 
 @download_router.post('/urls', response=Union[DownloadSchemaOutput,MediaErrorSchema])
-def download_media_urls(request, pids:list[str]):
+def download_media_urls(request, pids:List[str]):
     responses = []
     for pid in pids:
         _, response = download_media_url(request, pid=pid)

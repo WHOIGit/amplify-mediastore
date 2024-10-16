@@ -1,3 +1,4 @@
+from typing import List
 from ninja import Router
 
 from schemas.mediastore import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate, \
@@ -24,19 +25,19 @@ def hello(request):
 
 ## MEDIA BULK ##
 
-@router.post('/media/search', response=list[MediaSchema])
+@router.post('/media/search', response=List[MediaSchema])
 def media_search(request, search_params:MediaSearchSchema):
     return MediaService.search(search_params)
 
-@router.post('/media/create', response=list[MediaSchema])
-def media_create(request, medias: list[MediaSchemaCreate]):
+@router.post('/media/create', response=List[MediaSchema])
+def media_create(request, medias: List[MediaSchemaCreate]):
     created_media = []
     for media in medias:
         created_media.append( MediaService.create(media) )
     return created_media
 
-@router.post('/media/read', response=list[MediaSchema])
-def media_read(request, pids: list[str]):
+@router.post('/media/read', response=List[MediaSchema])
+def media_read(request, pids: List[str]):
     # TODO list failed efforts?
     return MediaService.bulk_read(pids)
 
@@ -53,42 +54,42 @@ def bulk_update_response(payload:list, function):
     return BulkUpdateResponseSchema(successes=successes, failures=failures)
 
 @router.post('/media/delete', response=BulkUpdateResponseSchema)
-def media_delete(request, pids: list[str]):
+def media_delete(request, pids: List[str]):
     return bulk_update_response(pids, MediaService.delete)
 
 @router.patch('/media/update/tags', response=BulkUpdateResponseSchema)
-def media_update_tags_add(request, payload: list[MediaSchemaUpdateTags]):
+def media_update_tags_add(request, payload: List[MediaSchemaUpdateTags]):
     return bulk_update_response(payload, MediaService.update_tags_add)
 @router.put('/media/update/tags', response=BulkUpdateResponseSchema)
-def media_update_tags_put(request, payload: list[MediaSchemaUpdateTags]):
+def media_update_tags_put(request, payload: List[MediaSchemaUpdateTags]):
     return bulk_update_response(payload, MediaService.update_tags_put)
 
 @router.put('/media/update/storekeys', response=BulkUpdateResponseSchema)
-def media_update_storekeys(request, payload: list[MediaSchemaUpdateStorekey]):
+def media_update_storekeys(request, payload: List[MediaSchemaUpdateStorekey]):
     return bulk_update_response(payload, MediaService.update_storekey)
 
 @router.put('/media/update/identifiers', response=BulkUpdateResponseSchema)
-def media_update_identifiers(request, payload: list[MediaSchemaUpdateIdentifiers]):
+def media_update_identifiers(request, payload: List[MediaSchemaUpdateIdentifiers]):
     return bulk_update_response(payload, MediaService.update_identifiers)
 
 @router.put('/media/update/metadata', response=BulkUpdateResponseSchema)
-def media_update_metadata_put(request, payload: list[MediaSchemaUpdateMetadata]):
+def media_update_metadata_put(request, payload: List[MediaSchemaUpdateMetadata]):
     return bulk_update_response(payload, MediaService.update_metadata_put)
 @router.patch('/media/update/metadata', response=BulkUpdateResponseSchema)
-def media_update_metadata_patch(request, payload: list[MediaSchemaUpdateMetadata]):
+def media_update_metadata_patch(request, payload: List[MediaSchemaUpdateMetadata]):
     return bulk_update_response(payload, MediaService.update_metadata_patch)
 @router.delete('/media/update/metadata', response=BulkUpdateResponseSchema)
-def media_update_metadata_delete(request, payload: list[MediaSchemaUpdateMetadata]):
+def media_update_metadata_delete(request, payload: List[MediaSchemaUpdateMetadata]):
     return bulk_update_response(payload, MediaService.update_metadata_delete)
 
 @router.patch('/media/update', response=BulkUpdateResponseSchema)
-def patch_medias(request, pids: list[str], medias: list[MediaSchemaUpdate]):
+def patch_medias(request, pids: List[str], medias: List[MediaSchemaUpdate]):
     return bulk_update_response(pids, MediaService.patch)
 
 
 ## MEDIA ##
 
-@router.get('/media/dump', response=list[MediaSchema])
+@router.get('/media/dump', response=List[MediaSchema])
 def list_media(request):
     return MediaService.list_media()
 
@@ -114,7 +115,7 @@ def media_patch_single(request, pid: str, payload: MediaSchemaUpdate):
 
 ## STORE CONFIG ##
 
-@router.get('/stores', response=list[StoreConfigSchema])
+@router.get('/stores', response=List[StoreConfigSchema])
 def list_stores(request):
     return StoreService.list_stores()
 
@@ -139,7 +140,7 @@ def delete_store(request, pk: int):
 
 ## S3 CONFIGS ##
 
-@router.get('/s3cfgs', response=list[S3ConfigSchemaSansKeys])
+@router.get('/s3cfgs', response=List[S3ConfigSchemaSansKeys])
 def list_s3cfg(request):
     return S3ConfigService.list_s3cfgs()
 
@@ -162,7 +163,7 @@ def delete_s3cfg(request, pk: int):
     return 204
 
 ## Identifiers ##
-@router.get('/identifier/list', response=list[IdentifierTypeSchema])
+@router.get('/identifier/list', response=List[IdentifierTypeSchema])
 def list_identifiers(requests):
     return IdentifierTypeService.list()
 

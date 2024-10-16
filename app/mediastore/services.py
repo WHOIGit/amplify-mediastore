@@ -3,7 +3,7 @@ import uuid
 # for search
 from operator import and_,or_
 from functools import reduce
-from typing import Union
+from typing import Union, List
 
 from django.db.models import Q
 
@@ -46,7 +46,7 @@ class IdentifierTypeService:
         idtype.delete()
 
     @staticmethod
-    def list() -> list[IdentifierTypeSchema]:
+    def list() -> List[IdentifierTypeSchema]:
         idtypes = IdentifierType.objects.all()
         return [IdentifierTypeService.serialize(idtype) for idtype in idtypes]
 
@@ -81,7 +81,7 @@ class S3ConfigService:
         s3cfg.delete()
 
     @staticmethod
-    def list_s3cfgs() -> list[S3ConfigSchemaSansKeys]:
+    def list_s3cfgs() -> List[S3ConfigSchemaSansKeys]:
         s3cfgs = S3Config.objects.all()
         return [S3ConfigService.serialize(s3cfg) for s3cfg in s3cfgs]
 
@@ -141,7 +141,7 @@ class StoreService:
         store_config.delete()
 
     @staticmethod
-    def list_stores() -> list[StoreConfigSchema]:
+    def list_stores() -> List[StoreConfigSchema]:
         store_configs = StoreConfig.objects.all()
         return [StoreService.serialize(store_config) for store_config in store_configs]
 
@@ -191,7 +191,7 @@ class MediaService:
         return MediaService.serialize(media)
 
     @staticmethod
-    def bulk_read(pids: list[str]) -> list[MediaSchema]:
+    def bulk_read(pids: List[str]) -> List[MediaSchema]:
         medias = Media.objects.filter(pid__in=pids)
         return [MediaService.serialize(media) for media in medias]
 
@@ -232,7 +232,7 @@ class MediaService:
         return media.delete()
 
     @staticmethod
-    def list_media() -> list[MediaSchema]:
+    def list_media() -> List[MediaSchema]:
         medias = Media.objects.all()
         return [MediaService.serialize(media) for media in medias]
 
@@ -262,7 +262,7 @@ class MediaService:
         return payload.identifiers
 
     @staticmethod
-    def search(payload: MediaSearchSchema) -> list[MediaSchema]:
+    def search(payload: MediaSearchSchema) -> List[MediaSchema]:
         andQs = []
         tagsQ = Q(tags__name__in=payload.tags)
         andQs.append(tagsQ)
