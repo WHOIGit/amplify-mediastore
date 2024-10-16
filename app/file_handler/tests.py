@@ -18,8 +18,8 @@ except ImportError: requests=None
 from config.api import api
 
 from mediastore.models import Media, IdentityType, StoreConfig, S3Config
-from mediastore.schemas import MediaSchemaCreate, StoreConfigSchemaCreate, S3ConfigSchemaCreate
-from .schemas import UploadSchemaInput, DownloadSchemaInput
+from schemas.mediastore import MediaSchemaCreate, StoreConfigSchemaCreate, S3ConfigSchemaCreate
+from schemas.mediastore import UploadSchemaInput, DownloadSchemaInput
 
 def encode64(content:bytes) -> str:
     encoded = base64.b64encode(content)

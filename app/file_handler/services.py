@@ -1,14 +1,9 @@
 import base64
-from typing import Optional
 
-import amqp  # amplify_amqp_utils
-import storage  # amplify_storage_utils
-
-from file_handler.schemas import UploadSchemaInput, UploadSchemaOutput, UploadError, \
-                                 DownloadSchemaInput, DownloadSchemaOutput, DownloadError
+from schemas.mediastore import UploadSchemaInput, UploadSchemaOutput, UploadError, \
+                                 DownloadSchemaInput, DownloadSchemaOutput
 from mediastore.services import MediaService
 from mediastore.models import StoreConfig, S3Config, Media
-
 
 def encode64(content:bytes) -> str:
     encoded = base64.b64encode(content)

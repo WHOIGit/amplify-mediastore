@@ -1,15 +1,13 @@
 from ninja import Router
 
-from mediastore.schemas import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate, \
+from schemas.mediastore import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate, \
     MediaSearchSchema, BulkUpdateResponseSchema, MediaErrorSchema, MediaSchemaUpdateTags, MediaSchemaUpdateStorekey, \
     MediaSchemaUpdateIdentifiers, MediaSchemaUpdateMetadata
-from mediastore.schemas import StoreConfigSchema, StoreConfigSchemaCreate, S3ConfigSchemaSansKeys, S3ConfigSchemaCreate
-from mediastore.schemas import LoginInputDTO, TokenOutputDTO, ErrorDTO
+from schemas.mediastore import StoreConfigSchema, StoreConfigSchemaCreate, S3ConfigSchemaSansKeys, S3ConfigSchemaCreate
+from schemas.mediastore import LoginInputDTO, TokenOutputDTO, ErrorDTO
 from mediastore.services import MediaService, StoreService, S3ConfigService
 
-
 router = Router()
-
 
 @router.post("/login", response={200: TokenOutputDTO, 401: ErrorDTO}, auth=None)
 def login(request, login: LoginInputDTO):

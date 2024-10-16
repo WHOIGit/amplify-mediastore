@@ -4,6 +4,7 @@ django-ninja
 django-taggit
 django-simple-history
 djangorestframework
-git+https://github.com/WHOIGit/amplify-storage-utils
-git+https://github.com/WHOIGit/amplify-amqp-utils
+git+https://github.com/WHOIGit/amplify-schemas        # schemas module
+git+https://github.com/WHOIGit/amplify-storage-utils  # storage module
+git+https://github.com/WHOIGit/amplify-amqp-utils     # amqp module
 #requests  # for testing s3 presigned urls

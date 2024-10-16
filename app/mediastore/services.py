@@ -12,7 +12,7 @@ from django.db.utils import IntegrityError
 from ninja.errors import ValidationError, HttpError
 
 from mediastore.models import Media, IdentityType, StoreConfig, S3Config
-from mediastore.schemas import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate, StoreConfigSchema, \
+from schemas.mediastore import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate, StoreConfigSchema, \
     StoreConfigSchemaCreate, S3ConfigSchemaCreate, S3ConfigSchemaSansKeys, MediaSearchSchema, BulkUpdateResponseSchema, \
     MediaErrorSchema, MediaSchemaUpdateTags, MediaSchemaUpdateStorekey, MediaSchemaUpdateIdentifiers, \
     MediaSchemaUpdateMetadata
