@@ -31,12 +31,12 @@ class IdentifierTypeService:
 
     @staticmethod
     def read(name: str):
-        idtype = S3Config.objects.get(name=name)
+        idtype = IdentifierType.objects.get(name=name)
         return IdentifierTypeService.serialize(idtype)
 
     @staticmethod  # PUT
-    def update(name: str, idtype_schema: IdentifierTypeSchema):
-        idtype = IdentifierType.objects.get(name=name)
+    def update(idtype_schema: IdentifierTypeSchema):
+        idtype = IdentifierType.objects.get(name=idtype_schema.name)
         idtype.pattern = idtype_schema.pattern
         idtype.save()
 

@@ -164,21 +164,23 @@ def delete_s3cfg(request, pk: int):
 
 ## Identifiers ##
 @router.get('/identifier/list', response=List[IdentifierTypeSchema])
-def list_identifiers(requests):
+def list_identifiers(request):
     return IdentifierTypeService.list()
 
 @router.get('/identifier/{name}', response=IdentifierTypeSchema)
-def read_identifier(requests, name):
+def read_identifier(request, name):
     return IdentifierTypeService.read(name)
 
 @router.post('/identifier', response=IdentifierTypeSchema)
-def create_identifier(requests, payload:IdentifierTypeSchema):
+def create_identifier(request, payload:IdentifierTypeSchema):
     return IdentifierTypeService.create(payload)
 
 @router.put('/identifier', response={204: int})
-def update_identifier(requests, payload:IdentifierTypeSchema):
-    return IdentifierTypeService.create(payload)
+def update_identifier(request, payload:IdentifierTypeSchema):
+    IdentifierTypeService.update(payload)
+    return 204
 
 @router.delete('/identifier', response={204: int})
-def delete_identifier(requests, payload:IdentifierTypeSchema):
-    return IdentifierTypeService.create(payload)
+def delete_identifier(request, payload:IdentifierTypeSchema):
+    IdentifierTypeService.delete(payload)
+    return 204
