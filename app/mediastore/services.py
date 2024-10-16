@@ -11,11 +11,44 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.utils import IntegrityError
 from ninja.errors import ValidationError, HttpError
 
-from mediastore.models import Media, IdentityType, StoreConfig, S3Config
+from mediastore.models import Media, IdentifierType, StoreConfig, S3Config, IdentifierType
 from schemas.mediastore import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate, StoreConfigSchema, \
     StoreConfigSchemaCreate, S3ConfigSchemaCreate, S3ConfigSchemaSansKeys, MediaSearchSchema, BulkUpdateResponseSchema, \
     MediaErrorSchema, MediaSchemaUpdateTags, MediaSchemaUpdateStorekey, MediaSchemaUpdateIdentifiers, \
-    MediaSchemaUpdateMetadata
+    MediaSchemaUpdateMetadata, IdentifierTypeSchema
+
+
+class IdentifierTypeService:
+    @staticmethod
+    def serialize(idtype: IdentifierType):
+        return IdentifierTypeSchema(name=idtype.name, pattern=idtype.pattern)
+
+    @staticmethod
+    def create(idtype_schema: IdentifierTypeSchema, as_schema=True):
+        idtype, idtype_created = IdentifierType.objects.get_or_create(**dict(idtype_schema))
+        if as_schema: return IdentifierTypeService.serialize(idtype)
+        return idtype, idtype_created
+
+    @staticmethod
+    def read(name: str):
+        idtype = S3Config.objects.get(name=name)
+        return IdentifierTypeService.serialize(idtype)
+
+    @staticmethod  # PUT
+    def update(name: str, idtype_schema: IdentifierTypeSchema):
+        idtype = IdentifierType.objects.get(name=name)
+        idtype.pattern = idtype_schema.pattern
+        idtype.save()
+
+    @staticmethod
+    def delete(name: str):
+        idtype = IdentifierType.objects.get(name=name)
+        idtype.delete()
+
+    @staticmethod
+    def list() -> list[IdentifierTypeSchema]:
+        idtypes = IdentifierType.objects.all()
+        return [IdentifierTypeService.serialize(idtype) for idtype in idtypes]
 
 
 class S3ConfigService:
@@ -210,12 +243,21 @@ class MediaService:
             pid, pid_type = media_obj.pid, media_obj.pid_type
         else:
             pid, pid_type = payload.pid, payload.pid_type
-        if not IdentityType.objects.filter(name=pid_type).exists(): raise ValidationError([dict(error=f'bad pid_type: {pid_type}')])
+
+        if not IdentifierType.objects.filter(name=pid_type).exists():
+            raise ValidationError([dict(error=f'bad pid_type: {pid_type}')])
+        pid_type_obj = IdentifierType.objects.get(name=pid_type)
+        # TODO validate pid against pid_type_object.pattern
+
         for key, val in payload.identifiers.items():
-            if not IdentityType.objects.filter(name=key).exists(): raise ValidationError([dict(error=f'bad identifier_type: {key}')])
+            if not IdentifierType.objects.filter(name=key).exists():
+                raise ValidationError([dict(error=f'bad identifier_type: {key}')])
             if key == pid_type:
                 if not val == pid: raise ValidationError([dict(error=f'duplicate pid_type in identifiers DO NOT MATCH: media[{pid_type}]:{pid} =! identifier[{key}]:{val}')])
                 pop_me = key
+            idtype_obj = IdentifierType.objects.get(name=key)
+            # TODO validate val against idtype_obj.pattern
+
         if pop_me: payload.identifiers.pop(pop_me)
         return payload.identifiers
 

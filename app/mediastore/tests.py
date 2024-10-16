@@ -8,7 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 
-from .models import Media, IdentityType, StoreConfig
+from .models import Media, IdentifierType, StoreConfig
 from schemas.mediastore import StoreConfigSchema, StoreConfigSchemaCreate, S3ConfigSchemaCreate, S3ConfigSchemaSansKeys, \
     MediaSearchSchema, MediaSchemaUpdateIdentifiers, MediaSchemaUpdateMetadata, MediaSchemaUpdateTags
 
@@ -34,9 +34,9 @@ class MediaApiTest(TestCase):
 
     def setUp(self):
         self.client = TestClient(api)
-        IdentityType.objects.create(name='DEMO')
-        IdentityType.objects.create(name='BIN')
-        IdentityType.objects.create(name='DEMO2')
+        IdentifierType.objects.create(name='DEMO')
+        IdentifierType.objects.create(name='BIN')
+        IdentifierType.objects.create(name='DEMO2')
         self.demostore_dict = dict(StoreConfigSchemaCreate(type='FilesystemStore', bucket='/demobucket', s3_url=''))
         self.user, created_user = User.objects.get_or_create(username='testuser')
         self.token, created_token = Token.objects.get_or_create(user=self.user)
@@ -345,6 +345,12 @@ class MediaApiTest(TestCase):
     # PUT PATCH DELETE /media/update/metadata
     # PATCH /media/update
     # POST /media/search identifiers+pid w/ wildcard, metadata, store_status, store_key, pid_type
+    # GET /identifier/list
+    # GET /identifier/<name>
+    # POST /identifier
+    # PUT /identifier
+    # DELETE /identifier
+
 
     def test_metadata(self):
         PID = whoami()

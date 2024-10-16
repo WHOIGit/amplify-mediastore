@@ -3,9 +3,9 @@ from ninja import Router
 from schemas.mediastore import MediaSchema, MediaSchemaCreate, MediaSchemaUpdate, \
     MediaSearchSchema, BulkUpdateResponseSchema, MediaErrorSchema, MediaSchemaUpdateTags, MediaSchemaUpdateStorekey, \
     MediaSchemaUpdateIdentifiers, MediaSchemaUpdateMetadata
-from schemas.mediastore import StoreConfigSchema, StoreConfigSchemaCreate, S3ConfigSchemaSansKeys, S3ConfigSchemaCreate
+from schemas.mediastore import StoreConfigSchema, StoreConfigSchemaCreate, S3ConfigSchemaSansKeys, S3ConfigSchemaCreate, IdentifierTypeSchema
 from schemas.mediastore import LoginInputDTO, TokenOutputDTO, ErrorDTO
-from mediastore.services import MediaService, StoreService, S3ConfigService
+from mediastore.services import MediaService, StoreService, S3ConfigService, IdentifierTypeService
 
 router = Router()
 
@@ -160,3 +160,24 @@ def put_s3cfg(request, pk: int, s3cfg: S3ConfigSchemaCreate):
 def delete_s3cfg(request, pk: int):
     S3ConfigService.delete(pk)
     return 204
+
+## Identifiers ##
+@router.get('/identifier/list', response=list[IdentifierTypeSchema])
+def list_identifiers(requests):
+    return IdentifierTypeService.list()
+
+@router.get('/identifier/{name}', response=IdentifierTypeSchema)
+def read_identifier(requests, name):
+    return IdentifierTypeService.read(name)
+
+@router.post('/identifier', response=IdentifierTypeSchema)
+def create_identifier(requests, payload:IdentifierTypeSchema):
+    return IdentifierTypeService.create(payload)
+
+@router.put('/identifier', response={204: int})
+def update_identifier(requests, payload:IdentifierTypeSchema):
+    return IdentifierTypeService.create(payload)
+
+@router.delete('/identifier', response={204: int})
+def delete_identifier(requests, payload:IdentifierTypeSchema):
+    return IdentifierTypeService.create(payload)

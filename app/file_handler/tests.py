@@ -17,7 +17,7 @@ except ImportError: requests=None
 
 from config.api import api
 
-from mediastore.models import Media, IdentityType, StoreConfig, S3Config
+from mediastore.models import Media, IdentifierType, StoreConfig, S3Config
 from schemas.mediastore import MediaSchemaCreate, StoreConfigSchemaCreate, S3ConfigSchemaCreate
 from schemas.mediastore import UploadSchemaInput, DownloadSchemaInput
 
@@ -32,7 +32,7 @@ def decode64(content:str) -> bytes:
 
 class FileHandlerFilestoreTests(TestCase):
     def setUp(self):
-        IdentityType.objects.create(name='DEMO')
+        IdentifierType.objects.create(name='DEMO')
         self.storeconfig_dict = dict(StoreConfigSchemaCreate(type=StoreConfig.FILESYSTEMSTORE, bucket='/demobucket', s3_url=''))
         self.user, created_user = User.objects.get_or_create(username='testuser')
         self.token, created_token = Token.objects.get_or_create(user=self.user)
@@ -67,7 +67,7 @@ class FileHandlerFilestoreTests(TestCase):
 @skipUnless(os.environ.get('TESTS_S3_URL'), '"TESTS_S3_URL" env variable set')
 class FileHandlerS3storeTests(TestCase):
     def setUp(self):
-        IdentityType.objects.create(name='DEMO')
+        IdentifierType.objects.create(name='DEMO')
         self.user, created_user = User.objects.get_or_create(username='testuser')
         self.token, created_token = Token.objects.get_or_create(user=self.user)
         self.auth_headers = {'Authorization':f'Bearer {self.token}'}

@@ -25,10 +25,9 @@ class DictStoreSingleton(storage.object.DictStore):
             self.objects = {}
 
 
-class IdentityType(models.Model):
+class IdentifierType(models.Model):
     name = models.CharField(max_length=255, unique=True)
-    #display_name = models.CharField(max_length=255)
-    #regex = models.CharField(max_length=255)
+    pattern = models.CharField(max_length=255)
 
 class S3Config(models.Model):
     url = models.URLField(max_length=255, unique=True)

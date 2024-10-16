@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import StoreConfig, S3Config, IdentityType
+from .models import StoreConfig, S3Config, IdentifierType
 
 class StoreConfigAdmin(admin.ModelAdmin):
     list_display = ('pk', 'type', 'bucket', 's3cfg__url', 's3cfg__pk')
@@ -17,4 +17,4 @@ class IdentityTypeAdmin(admin.ModelAdmin):
 
 admin.site.register(StoreConfig,StoreConfigAdmin)
 admin.site.register(S3Config,S3ConfigAdmin)
-admin.site.register(IdentityType,IdentityTypeAdmin)
+admin.site.register(IdentifierType, IdentityTypeAdmin)
