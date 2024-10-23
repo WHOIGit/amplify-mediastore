@@ -180,7 +180,7 @@ def update_identifier(request, payload:IdentifierTypeSchema):
     IdentifierTypeService.update(payload)
     return 204
 
-@router.delete('/identifier', response={204: int})
-def delete_identifier(request, payload:IdentifierTypeSchema):
-    IdentifierTypeService.delete(payload)
+@router.delete('/identifier/{name}', response={204: int})
+def delete_identifier(request, name:str):
+    IdentifierTypeService.delete(name)
     return 204
