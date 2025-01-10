@@ -222,13 +222,16 @@ class MediaService:
     def delete(pid: str, del_stored=True) -> None:
         media = Media.objects.get(pid=pid)
         store_obj_deleted = None
-        if del_stored and media.store_status==StoreConfig.READY:
-            if media.store_config.storage_is_context_managed:
-                with media.store_config.get_storage_store() as store:
+        try:
+            if del_stored and media.store_status==StoreConfig.READY:
+                if media.store_config.storage_is_context_managed:
+                    with media.store_config.get_storage_store() as store:
+                        store_obj_deleted = store.delete(media.store_key)
+                else:
+                    store = media.store_config.get_storage_store()
                     store_obj_deleted = store.delete(media.store_key)
-            else:
-                store = media.store_config.get_storage_store()
-                store_obj_deleted = store.delete(media.store_key)
+        except KeyError as e:
+            print(type(e),e)
         return media.delete()
 
     @staticmethod
