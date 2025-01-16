@@ -389,14 +389,14 @@ class MediaVersioningTest(TestCase):
     def test_Versioning_patch(self):
         PK = MediaApiTest.test_create_patch(self)
         media = Media.objects.get(pk=PK)
-        m1 = media.history.earliest()   # first one   .first() not correrct
-        m2 = media.history.latest()     # most recent .last() not correct
+        m1 = media.marks.earliest()   # first one   .first() not correrct
+        m2 = media.marks.latest()     # most recent .last() not correct
 
         self.assertEqual(m1.metadata, {'egg':'nog', 'zip':'zap', 'quick':'quack'})
         self.assertEqual(m2.metadata, {'egg':'nog', 'EGG':'NOG', 'zip':'ZAP', 'quick':'quack'} )
 
         model_diff = m2.diff_against(m1)  # NEWER INSTANCE diff_against OLDER INSTANCE
-        expected_changed_fields = sorted(['identifiers','metadata'])  # tags is foreign key and not diff'd
+        expected_changed_fields = sorted(['s3url','identifiers','metadata'])  # tags is foreign key and not diff'd
         self.assertEqual(sorted(model_diff.changed_fields), expected_changed_fields )
 
         metadata_changes = [modelchange for modelchange in model_diff.changes if modelchange.field=='metadata'][0]

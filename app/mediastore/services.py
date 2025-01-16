@@ -148,11 +148,19 @@ class StoreService:
 
 class MediaService:
     @staticmethod
-    def serialize(media: Media) -> MediaSchema:
+    def serialize(media: Union[Media, Media.marks.model]) -> MediaSchema:
+        if isinstance(media, Media):
+            version = media.version or 'latest'
+        elif media == media.history_object.marks.latest():
+            version = media.version or 'latest'
+        else:
+            version = media.version
         return MediaSchema(
             pk = media.pk,
             pid = media.pid,
             pid_type = media.pid_type,
+            mark=media.marks.latest().history_id if isinstance(media, Media) else media.history_id,
+            version=version,
             store_config = StoreService.serialize(media.store_config),
             store_key = media.store_key,
             store_status = media.store_status,
@@ -161,11 +169,10 @@ class MediaService:
             tags = media.tags.names()
         )
 
-    @staticmethod
     def create(payload: MediaSchemaCreate, as_schema=True) -> MediaSchema:
         MediaService.clean_identifiers(payload)
-        store_key = str(uuid.uuid4())  # CREATE STORE KEY #
-        store_config,storeconfig_created = StoreService.create(payload.store_config, as_schema=False)
+        store_key = str(uuid.uuid4())  # CREATE STORE KEY # TODO prefixes
+        store_config, storeconfig_created = StoreService.create(payload.store_config, as_schema=False)
         try:
             media = Media.objects.create(
                 pid = payload.pid,
@@ -178,7 +185,8 @@ class MediaService:
             )
         except IntegrityError as e:
             if str(e) == 'UNIQUE constraint failed: mediastore_media.store_key, mediastore_media.store_config_id':
-                raise ValidationError([dict(error=f'store_key "{payload.store_key}" is not unique with this store_config')])
+                raise ValidationError(
+                    [dict(error=f'store_key "{payload.store_key}" is not unique with this store_config')])
             else:
                 raise ValidationError([dict(error=f'{type(e)}:{e}')])
         media.tags.set(payload.tags)

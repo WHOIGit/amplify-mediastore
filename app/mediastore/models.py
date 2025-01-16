@@ -113,7 +113,8 @@ class Media(models.Model):
     identifiers = models.JSONField(default=dict)
     metadata = models.JSONField(default=dict)
     tags = TaggableManager()
-    history = HistoricalRecords()
+    marks = HistoricalRecords()
+    version = models.CharField(max_length=255, blank=True, null=True)
     # TODO lifecycle, other relationships
 
     def __str__(self):
