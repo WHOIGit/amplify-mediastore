@@ -1,5 +1,6 @@
 import base64
 
+import uuid
 from schemas.mediastore import UploadSchemaInput, UploadSchemaOutput, UploadError, \
                                  DownloadSchemaInput, DownloadSchemaOutput
 from mediastore.services import MediaService
@@ -27,7 +28,12 @@ class UploadService:
 
     @staticmethod
     def upload_with_file(payload: UploadSchemaInput) -> UploadSchemaOutput:
-        media = MediaService.create(payload.mediadata, as_schema=False)
+        try:
+            pid = payload.mediadata.pid
+            media = Media.objects.get(pid=pid)
+            media.store_key = str(uuid.uuid4())
+        except Media.DoesNotExist:
+            media = MediaService.create(payload.mediadata, as_schema=False)
         if media.store_config.storage_is_context_managed:
             with media.store_config.get_storage_store() as store:
                 store.put(media.store_key, bytearray(decode64(payload.base64)))
@@ -45,9 +51,15 @@ class UploadService:
     @staticmethod
     def upload_sans_file(payload: UploadSchemaInput) -> UploadSchemaOutput:
         assert payload.mediadata.store_config.type == StoreConfig.BUCKETSTORE
-        media = MediaService.create(payload.mediadata, as_schema=False)  # returns MediaSchema after creating database entry
+        try:
+            pid = payload.mediadata.pid
+            media = Media.objects.get(pid=pid)
+            media.store_key = str(uuid.uuid4())
+        except Media.DoesNotExist:
+            media = MediaService.create(payload.mediadata, as_schema=False)
         with media.store_config.get_storage_store() as store:
             put_url = store.presigned_put(media.store_key)
+        media.save()
         return UploadSchemaOutput(status=StoreConfig.PENDING, presigned_put=put_url)
 
 
