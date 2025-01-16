@@ -98,12 +98,14 @@ class MediaApiTest(TestCase):
             store_status = StoreConfig.PENDING,
             metadata = {},
             tags = [],
+            version = 'latest',
         )
         resp = self.client.post("/media", json=payload, headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
         resp2 = self.client.get(f"/media/{PID}", headers=self.auth_headers)
         received = resp2.json()
         received.pop('pk')
+        received.pop('mark')
         received['store_config'].pop('pk')
         received = ordered(received)
         expected = ordered(expected)
@@ -228,6 +230,7 @@ class MediaApiTest(TestCase):
         resp = self.client.get(f'/media/{PID}', headers=self.auth_headers)
         self.assertEqual(resp.status_code, 200, msg=resp.content.decode())
         received3 = resp.json()
+        received3.pop('mark')
         received3['store_config'].pop('pk')
         received3 = ordered(received3)
 
@@ -240,6 +243,7 @@ class MediaApiTest(TestCase):
             identifiers = {'DEMO2':'newvalue'},
             metadata = {'egg':'nog', 'EGG':'NOG', 'zip':'ZAP', 'quick':'quack'},
             tags = ['one', 'two', 'three'],
+            version = 'latest',
         )
         expected = ordered(expected)
         self.assertEqual(received3, expected, msg=f'{received3} != {expected}')
@@ -269,6 +273,7 @@ class MediaApiTest(TestCase):
         resp3 = self.client.get(f'/media/{PID}', headers=self.auth_headers)
         self.assertEqual(resp3.status_code, 200, msg=resp3.content.decode())
         received3 = resp3.json()
+        received3.pop('mark')
         received3['store_config'].pop('pk')
         received3 = ordered(received3)
 
@@ -281,6 +286,7 @@ class MediaApiTest(TestCase):
             store_status = StoreConfig.PENDING,
             metadata = {},
             tags = [],
+            version = 'latest',
         )
         expected = ordered(expected)
         self.assertEqual(received3, expected, msg=f'{received3} != {expected}')
@@ -396,7 +402,7 @@ class MediaVersioningTest(TestCase):
         self.assertEqual(m2.metadata, {'egg':'nog', 'EGG':'NOG', 'zip':'ZAP', 'quick':'quack'} )
 
         model_diff = m2.diff_against(m1)  # NEWER INSTANCE diff_against OLDER INSTANCE
-        expected_changed_fields = sorted(['s3url','identifiers','metadata'])  # tags is foreign key and not diff'd
+        expected_changed_fields = sorted(['identifiers','metadata'])  # tags is foreign key and not diff'd
         self.assertEqual(sorted(model_diff.changed_fields), expected_changed_fields )
 
         metadata_changes = [modelchange for modelchange in model_diff.changes if modelchange.field=='metadata'][0]
